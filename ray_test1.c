@@ -11,16 +11,16 @@ const uint64_t ONE_64 = 1LLU;
 
 double get_time(uint64_t end, uint64_t start)
 {
-    uint64_t difference = end - start;
-    static double conversion = 0.0;
-    if (conversion == 0.0)
-    {
-        mach_timebase_info_data_t info;
-        kern_return_t err = mach_timebase_info( &info );
-        if (err == 0)
+	uint64_t difference = end - start;
+	static double conversion = 0.0;
+	if (conversion == 0.0)
+	{
+		mach_timebase_info_data_t info;
+		kern_return_t err = mach_timebase_info( &info );
+		if (err == 0)
 			conversion = 1e-9 * (double)info.numer / (double)info.denom;
-    }
-    return conversion * (double)difference;
+	}
+	return conversion * (double)difference;
 }
 
 
@@ -109,7 +109,7 @@ int main(void)
 								if (hero > villain)
 									equity_count += 2;
 								if (hero == villain)
-									equity_count += 1;
+									equity_count++;
 							}
 						}
 					}
