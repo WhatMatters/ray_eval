@@ -31,6 +31,8 @@ void init_random_int_52(void)
 	srand(time(NULL));
 }
 
+// Generate a random integer from [0, k],
+// i.e. k + 1 distinct values
 int random_int_52(int k) 
 {
     int r;
@@ -41,11 +43,7 @@ int random_int_52(int k)
     return r;
 }
 
-// Reservoir sampling
-// http://en.wikipedia.org/wiki/Reservoir_sampling
-// Can we do any faster?
-// Sampling via weighted tree?
-// http://www.stdlib.net/~colmmacc/2011/05/15/weighty-matters/
+// Reservoir sampling : http://en.wikipedia.org/wiki/Reservoir_sampling
 void random_sample_52(int n, int k, int *out)
 {
 	int i, r;
@@ -64,11 +62,34 @@ void random_sample_52(int n, int k, int *out)
 	}
 }
 
+const int DECK_52[52] = {
+	 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12,
+	13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+	26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
+	39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51};
+
+inline void swap(int *x, int *y)
+{
+	int z = *x;
+	*x = *y;
+	*y = z;
+}
+
+// Ross algorithm modified to work in-place (C) Aldanor
+// This is 4.5 faster than partial Fisher-Yates / reservoir
+void random_sample_52_ross(int n, int k, int *out)
+{
+	memcpy(out, DECK_52, sizeof(DECK_52));
+	int i;
+	for (i = 0; i < k; i++)
+		swap(out + i, out + i + random_int_52(51 - i));
+}
+
 int main(void)
 {
 	const int N = 1e7, N2 = 1e6;
 	const int n = 52;
-	const int k = 15;
+	const int k = 10;
 	int i, j, out[n];
 	int counts[n];
 
@@ -76,13 +97,13 @@ int main(void)
 	printf("Generating %d random samples (%d out of %d)...\n", N, k, n);
 	uint64_t start = mach_absolute_time();
 	for (i = 0; i < N; i++)
-		random_sample_52(n, k, out);
+		random_sample_52_ross(n, k, out);
 	double elapsed = get_time(mach_absolute_time(), start);
 
 	printf("Verifying counts...\n");
 	for (i = 0; i < N2; i++)
 	{
-		random_sample_52(n, k, out);
+		random_sample_52_ross(n, k, out);
 		for (j = 0; j < k; j++)
 			counts[out[j]]++;
 	}
