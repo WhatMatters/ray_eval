@@ -76,16 +76,144 @@ inline void swap(int *x, int *y)
 }
 
 // Ross algorithm modified to work in-place (C) Aldanor
-// This is 4.5 faster than partial Fisher-Yates / reservoir
+// This is 4.5x faster than partial Fisher-Yates / reservoir
 void random_sample_52_ross(int n, int k, int *out)
 {
 	memcpy(out, DECK_52, sizeof(DECK_52));
 	int i;
 	for (i = 0; i < k; i++)
-		swap(out + i, out + i + random_int_52(51 - i));
+		swap(out + i, out + i + random_int_52(n - 1 - i));
 }
 
-int main(void)
+const uint64_t ONE_64 = 1LLU;
+
+inline void extract_cards(uint64_t *deck, int card)
+{
+	*deck ^= (ONE_64 << card);
+}
+
+inline void get_cards(uint64_t deck, int *cards, int shift)
+{
+	int i, pos = 0;
+
+	for (i = 0; i < 52; i++)
+		if (deck & (ONE_64 << i))
+			cards[pos++] = i + shift;
+}
+
+uint64_t new_deck()
+{
+	uint64_t deck = 0;
+	int i;
+
+	for (i = 0; i < 52; i++)
+		deck |= (ONE_64 << i);
+	return deck;
+}
+
+#define MAX_PLAYERS 10
+
+int eval_monte_carlo_holdem(const int *HR, int N, int *board, int n_board, 
+	int *pocket, int n_players, double *ev)
+{
+	int mask[52], cards[52], n_cards = 0, n_mask = 0, n_available, i, j, k;
+	memset(mask, 0, 52 * sizeof(int));
+	memset(cards, 0, 52 * sizeof(int));
+	memset(ev, 0, n_players * sizeof(double));
+	uint64_t deck = new_deck();
+	int available_cards[52];
+	for (i = 0; i < n_board; i++)
+	{
+		if (board[i] == 0)
+			mask[n_mask++] = n_cards;
+		else
+			extract_cards(&deck, board[i]);
+		cards[n_cards++] = board[i] + 1; // convert 0 : 51 to 1 : 52
+	}
+	for (i = 0; i < 2 * n_players; i++)
+	{
+		if (pocket[i] == 0)
+			mask[n_mask++] = n_cards;
+		else
+			extract_cards(&deck, pocket[i]);
+		cards[n_cards++] = pocket[i] + 1; // convert 0 : 51 to 1 : 52
+	}
+	n_available = 52 - n_board - 2 * n_players + n_mask;
+	get_cards(deck, available_cards, 1); // convert 0 : 51 to 1 : 52
+	init_random_int_52();
+	for (i = 0; i < N; i++)
+	{
+		int sample[52], scores[MAX_PLAYERS], best_score = -1, tied = 0;
+		random_sample_52_ross(n_available, n_mask, sample);
+		for (j = 0; j < n_mask; j++)
+			cards[mask[j]] = available_cards[sample[j]];
+		int path = 53;
+		for (j = 0; j < n_board; j++)
+			path = HR[path + cards[j]];
+		int *player_cards = cards + n_board;
+		for (k = 0; k < n_players; k++)
+		{
+			int score = HR[HR[path + player_cards[0]] + player_cards[1]];
+			scores[k] = score;
+			if (score > best_score)
+			{
+				best_score = score;
+				tied = 1;
+			}
+			else if (score == best_score)
+				tied++;
+			player_cards += 2;
+		}
+		double delta_ev = 1.0 / tied;
+		for (k = 0; k < n_players; k++)
+			if (scores[k] == best_score)
+				ev[k] += delta_ev;
+	}
+	for (k = 0; k < n_players; k++)
+		ev[k] /= (double)N;
+	return 0;
+}
+
+int eval_monte_carlo_omaha(const int *HR, int N, int *board, int n_board, 
+	int *pocket, int n_players, double ev)
+{
+	const int pocket_perms[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+	int board_perms[10][3] = {
+		{0, 1, 2}, // all board sizes
+		{0, 1, 3}, {0, 2, 3}, {1, 2, 3}, // >= 4 
+		{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}, // == 5
+		n_board_perm = n_board == 5 ? 10 : n_board == 4 ? 4 : n_board == 3 ? 1 : -1;
+	if (n_board_perm == -1)
+		return 1;
+}
+
+void test_monte_carlo_1()
+{
+	static int HR[32487834]; 
+	
+	printf("Loading cards...\n");
+	FILE *f = fopen("HandRanks.dat", "rb");
+	fread(HR, sizeof(HR), 1, f);
+	fclose(f);
+	printf("Loading completed.\n");
+
+	int board[5] = {0, 0, 0, 0, 0},
+		n_board = 5,
+		pocket[4] = {46, 30, 0, 0},
+		n_players = 2;
+
+	double ev[2];
+	int N = 1e7;
+
+	uint64_t start = mach_absolute_time();
+	printf("Generating %d Monte-Carlo hands...\n", N);
+	eval_monte_carlo_holdem(HR, N, board, n_board, pocket, n_players, ev);
+	double elapsed = get_time(mach_absolute_time(), start);
+	printf("Kh9h EV vs 1 unknown: %.4f%%.\n", ev[0] * 100.);
+	printf("Elapsed: %.4f seconds (%.0f hands / sec).\n", elapsed, (N / elapsed));	
+}
+
+void test_sampling()
 {
 	const int N = 1e7, N2 = 1e6;
 	const int n = 52;
@@ -111,7 +239,14 @@ int main(void)
 	for (i = 0; i < n; i++)
 		printf("%6d: %.6f%%\n", i, 100.0 * ((double)counts[i] / k) / (double)N2);
 
-	printf("\nRandom sampling took %.4f seconds (%.0f samples / sec).\n", elapsed, (N / elapsed));
+	printf("\nRandom sampling took %.4f seconds (%.0f samples / sec).\n", elapsed, (N / elapsed));	
+}
+
+int main(void)
+{
+	test_monte_carlo_1();
+
+	// test_sampling();
 
 	return 0; 
 }
