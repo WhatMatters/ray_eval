@@ -175,23 +175,93 @@ int eval_monte_carlo_holdem(const int *HR, int N, int *board, int n_board,
 }
 
 int eval_monte_carlo_omaha(const int *HR, int N, int *board, int n_board, 
-	int *pocket, int n_players, double ev)
+	int *pocket, int n_players, double *ev)
 {
-	const int pocket_perms[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+	const int pocket_perms[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}},
+		n_pocket_perms = 6;
 	int board_perms[10][3] = {
 		{0, 1, 2}, // all board sizes
 		{0, 1, 3}, {0, 2, 3}, {1, 2, 3}, // >= 4 
 		{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}, // == 5
-		n_board_perm = n_board == 5 ? 10 : n_board == 4 ? 4 : n_board == 3 ? 1 : -1;
-	if (n_board_perm == -1)
+		n_board_perms = n_board == 5 ? 10 : n_board == 4 ? 4 : n_board == 3 ? 1 : -1;
+	if (n_board_perms == -1)
 		return 1;
+
+	int mask[52], cards[52], n_cards = 0, n_mask = 0, n_available, i, j, k, nb, np;
+	memset(mask, 0, 52 * sizeof(int));
+	memset(cards, 0, 52 * sizeof(int));
+	memset(ev, 0, n_players * sizeof(double));
+	uint64_t deck = new_deck();
+	int available_cards[52];
+	for (i = 0; i < n_board; i++)
+	{
+		if (board[i] == 0)
+			mask[n_mask++] = n_cards;
+		else
+			extract_cards(&deck, board[i]);
+		cards[n_cards++] = board[i] + 1; // convert 0 : 51 to 1 : 52
+	}
+	for (i = 0; i < 4 * n_players; i++)
+	{
+		if (pocket[i] == 0)
+			mask[n_mask++] = n_cards;
+		else
+			extract_cards(&deck, pocket[i]);
+		cards[n_cards++] = pocket[i] + 1; // convert 0 : 51 to 1 : 52
+	}
+	n_available = 52 - n_board - 4 * n_players + n_mask;
+	get_cards(deck, available_cards, 1); // convert 0 : 51 to 1 : 52
+	init_random_int_52();
+	for (i = 0; i < N; i++)
+	{
+		int sample[52], scores[MAX_PLAYERS], best_score = -1, tied = 0;
+		random_sample_52_ross(n_available, n_mask, sample);
+		for (j = 0; j < n_mask; j++)
+			cards[mask[j]] = available_cards[sample[j]];
+		int *player_cards = cards + n_board;
+		for (k = 0; k < n_players; k++)
+		{
+			int score = -1;
+			for (nb = 0; nb < n_board_perms; nb++)
+			{
+				int path = HR[HR[HR[53 + 
+					cards[board_perms[nb][0]]] + 
+						cards[board_perms[nb][1]]] + 
+							cards[board_perms[nb][2]]];
+				for (np = 0; np < n_pocket_perms; np++)
+				{
+					int current_score = HR[HR[path + 
+						player_cards[pocket_perms[np][0]]] + 
+							player_cards[pocket_perms[np][1]]];
+					if (current_score > score)
+						score = current_score;
+				}
+			}
+			scores[k] = score;
+			if (score > best_score)
+			{
+				best_score = score;
+				tied = 1;
+			}
+			else if (score == best_score)
+				tied++;
+			player_cards += 4;
+		}
+		double delta_ev = 1.0 / tied;
+		for (k = 0; k < n_players; k++)
+			if (scores[k] == best_score)
+				ev[k] += delta_ev;
+	}
+	for (k = 0; k < n_players; k++)
+		ev[k] /= (double)N;
+	return 0;
 }
 
 void test_monte_carlo_1()
 {
 	static int HR[32487834]; 
 	
-	printf("Loading cards...\n");
+	printf("\nLoading cards...\n");
 	FILE *f = fopen("HandRanks.dat", "rb");
 	fread(HR, sizeof(HR), 1, f);
 	fclose(f);
@@ -203,14 +273,30 @@ void test_monte_carlo_1()
 		n_players = 2;
 
 	double ev[2];
-	int N = 1e7;
+	int N = 0.6 * 1e6;
 
 	uint64_t start = mach_absolute_time();
-	printf("Generating %d Monte-Carlo hands...\n", N);
+	printf("\nGenerating %d Monte-Carlo hands...\n", N);
 	eval_monte_carlo_holdem(HR, N, board, n_board, pocket, n_players, ev);
 	double elapsed = get_time(mach_absolute_time(), start);
-	printf("Kh9h EV vs 1 unknown: %.4f%%.\n", ev[0] * 100.);
+	printf("[HOLDEM] [Kh 9h] EV vs [* *] with board [* * * * *]: %.4f%%.\n", ev[0] * 100.);
 	printf("Elapsed: %.4f seconds (%.0f hands / sec).\n", elapsed, (N / elapsed));	
+
+	int omaha_board[5] = {2, 23, 0, 0, 0},
+		omaha_n_board = 5,
+		omaha_pocket[8] = {46, 30, 0, 0, 0, 0, 0, 0},
+		omaha_n_players = 2;
+	double omaha_ev[2];
+	// propokertools: equity should be 52.35% with 600k trials
+
+	start = mach_absolute_time();
+	printf("\nGenerating %d Monte-Carlo hands...\n", N);
+	eval_monte_carlo_omaha(HR, N, omaha_board, omaha_n_board, omaha_pocket, 
+		omaha_n_players, omaha_ev);
+	elapsed = get_time(mach_absolute_time(), start);
+	printf("[OMAHA] [Kh 9h Qh Qs] EV vs [* * * *] with board [2h * * * *]: %.4f%%.\n", omaha_ev[0] * 100.);
+	printf("Elapsed: %.4f seconds (%.0f hands / sec).\n\n", elapsed, (N / elapsed));	
+
 }
 
 void test_sampling()
