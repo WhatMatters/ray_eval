@@ -230,9 +230,9 @@ int eval_monte_carlo_omaha(const int *HR, int N, int *board, int n_board,
 							cards[board_perms[nb][2]]];
 				for (np = 0; np < n_pocket_perms; np++)
 				{
-					int current_score = HR[HR[path + 
+					int current_score = HR[HR[HR[path +  // HR[HR[...]] !! // fuck me
 						player_cards[pocket_perms[np][0]]] + 
-							player_cards[pocket_perms[np][1]]];
+							player_cards[pocket_perms[np][1]]]]; 
 					if (current_score > score)
 						score = current_score;
 				}
@@ -273,7 +273,7 @@ void test_monte_carlo_1()
 		n_players = 2;
 
 	double ev[2];
-	int N = 0.6 * 1e6;
+	int N = 5 * 1e6;
 
 	uint64_t start = mach_absolute_time();
 	printf("\nGenerating %d Monte-Carlo hands...\n", N);
@@ -282,19 +282,18 @@ void test_monte_carlo_1()
 	printf("[HOLDEM] [Kh 9h] EV vs [* *] with board [* * * * *]: %.4f%%.\n", ev[0] * 100.);
 	printf("Elapsed: %.4f seconds (%.0f hands / sec).\n", elapsed, (N / elapsed));	
 
-	int omaha_board[5] = {2, 23, 0, 0, 0},
+	int omaha_board[5] = {2, 3, 0, 0, 0},
 		omaha_n_board = 5,
-		omaha_pocket[8] = {46, 30, 0, 0, 0, 0, 0, 0},
+		omaha_pocket[8] = {46, 30, 0, 0, 51, 0, 0, 0},
 		omaha_n_players = 2;
 	double omaha_ev[2];
-	// propokertools: equity should be 52.35% with 600k trials
 
 	start = mach_absolute_time();
 	printf("\nGenerating %d Monte-Carlo hands...\n", N);
 	eval_monte_carlo_omaha(HR, N, omaha_board, omaha_n_board, omaha_pocket, 
 		omaha_n_players, omaha_ev);
 	elapsed = get_time(mach_absolute_time(), start);
-	printf("[OMAHA] [Kh 9h Qh Qs] EV vs [* * * *] with board [2h * * * *]: %.4f%%.\n", omaha_ev[0] * 100.);
+	printf("[OMAHA] [Kh 9h * *] EV vs [As * * *] with board [2h 2s * * *]: %.4f%%.\n", omaha_ev[0] * 100.);
 	printf("Elapsed: %.4f seconds (%.0f hands / sec).\n\n", elapsed, (N / elapsed));	
 
 }
