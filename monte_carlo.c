@@ -68,14 +68,14 @@ const int DECK_52[52] = {
 	26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
 	39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51};
 
-inline void swap(int *x, int *y)
+static void swap(int *x, int *y)
 {
 	int z = *x;
 	*x = *y;
 	*y = z;
 }
 
-inline int max(int x, int y)
+static int max(int x, int y)
 {
 	return x > y ? x : y;
 }
@@ -92,12 +92,12 @@ void random_sample_52_ross(int n, int k, int *out)
 
 const uint64_t ONE_64 = 1LLU;
 
-inline void extract_cards(uint64_t *deck, int card)
+static void extract_cards(uint64_t *deck, int card)
 {
 	*deck ^= (ONE_64 << card);
 }
 
-inline void get_cards(uint64_t deck, int *cards, int shift)
+static void get_cards(uint64_t deck, int *cards, int shift)
 {
 	int i, pos = 0;
 
@@ -181,21 +181,23 @@ int eval_monte_carlo_holdem(const int *HR, int N, int *board, int n_board,
 	return 0;
 }
 
+
+
 int eval_monte_carlo_omaha(const int *HR, int N, int *board, int n_board, 
 	int *pocket, int n_players, double *ev)
 {
-	const unsigned int pocket_perms[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+	const unsigned int pocket_perms[2][6] = {{0, 0, 0, 1, 1, 2}, {1, 2, 3, 2, 3, 3}};
 	const unsigned int n_pocket_perms = 6;
 	const unsigned int board_perms[10][3] = {
-		{0, 1, 2}, // all board sizes
-		{0, 1, 3}, {0, 2, 3}, {1, 2, 3}, // >= 4 
-		{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}; // == 5
+		{0, 1, 2}, // 3, 4, 5
+		{0, 1, 3}, {0, 2, 3}, {1, 2, 3}, // 4, 5
+		{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}; // 5
 	unsigned int n_board_perms = n_board == 5 ? 10 : n_board == 4 ? 4 : n_board == 3 ? 1 : -1;
 	if (n_board_perms == -1)
 		return 1;
 
 	unsigned int mask[52], cards[52], n_cards = 0, n_mask = 0, n_available, 
-		i, j, k, available_cards[52], sample[52], scores[MAX_PLAYERS], nb, np;
+		i, j, available_cards[52], sample[52], nb, np;
 
 	memset(mask, 0, 52 * sizeof(unsigned int));
 	memset(cards, 0, 52 * sizeof(unsigned int));
@@ -204,7 +206,7 @@ int eval_monte_carlo_omaha(const int *HR, int N, int *board, int n_board,
 
 	for (i = 0; i < n_board; i++)
 	{
-		if (board[i] == 0)
+		if (!board[i])
 			mask[n_mask++] = n_cards;
 		else
 			extract_cards(&deck, board[i]);
@@ -212,7 +214,7 @@ int eval_monte_carlo_omaha(const int *HR, int N, int *board, int n_board,
 	}
 	for (i = 0; i < 4 * n_players; i++)
 	{
-		if (pocket[i] == 0)
+		if (!pocket[i])
 			mask[n_mask++] = n_cards;
 		else
 			extract_cards(&deck, pocket[i]);
@@ -223,12 +225,12 @@ int eval_monte_carlo_omaha(const int *HR, int N, int *board, int n_board,
 	get_cards(deck, available_cards, 1); // convert 0-51 to 1-52
 
 	init_random_int_52();
-	for (i = 0; i < N; i++)
+	for (i = 0; i < N; ++i)
 	{
 		unsigned int best_score = 0;
 		unsigned int tied = 0;
 		random_sample_52_ross(n_available, n_mask, sample);
-		for (j = 0; j < n_mask; j++)
+		for (j = 0; j < n_mask; ++j)
 			cards[mask[j]] = available_cards[sample[j]];
 		unsigned int *player_cards = cards + n_board;
 		unsigned int board_paths[10];
@@ -237,16 +239,17 @@ int eval_monte_carlo_omaha(const int *HR, int N, int *board, int n_board,
 				cards[board_perms[nb][0]]] + 
 					cards[board_perms[nb][1]]] + 
 						cards[board_perms[nb][2]]];
-		for (k = 0; k < n_players; k++)
+		unsigned int scores[MAX_PLAYERS];
+		for (j = 0; j < n_players; ++j)
 		{
 			unsigned int score = 0;
-			for (nb = 0; nb < n_board_perms; nb++)
-				for (np = 0; np < n_pocket_perms; np++)
+			for (nb = 0; nb < n_board_perms; ++nb)
+				for (np = 0; np < n_pocket_perms; ++np)
 					// Aldanor: don't forget to use extra HR[...] for 5/6-card eval
 					score = max(score, HR[HR[HR[board_paths[nb] + 
-						player_cards[pocket_perms[np][0]]] + 
-							player_cards[pocket_perms[np][1]]]]);
-			scores[k] = score;
+						player_cards[pocket_perms[0][np]]] + 
+							player_cards[pocket_perms[1][np]]]]);
+			scores[j] = score;
 			if (score > best_score)
 			{
 				best_score = score;
@@ -257,12 +260,12 @@ int eval_monte_carlo_omaha(const int *HR, int N, int *board, int n_board,
 			player_cards += 4;
 		}
 		double delta_ev = 1.0 / tied;
-		for (k = 0; k < n_players; k++)
-			if (scores[k] == best_score)
-				ev[k] += delta_ev;
+		for (j = 0; j < n_players; j++)
+			if (scores[j] == best_score)
+				ev[j] += delta_ev;
 	}
-	for (k = 0; k < n_players; k++)
-		ev[k] /= (double)N;
+	for (i = 0; i < n_players; ++i)
+		ev[i] /= N;
 	return 0;
 }
 
@@ -282,7 +285,7 @@ void test_monte_carlo_1()
 		n_players = 2;
 
 	double ev[2];
-	int N = 5 * 1e6;
+	int N = 1e7;
 
 	uint64_t start = mach_absolute_time();
 	printf("\nGenerating %d Monte-Carlo hands...\n", N);
