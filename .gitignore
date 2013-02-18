@@ -17,3 +17,7 @@
 *.trace
 *.dtrace
 *.plist
+
+rayeval.egg-info
+
+*.pyc
