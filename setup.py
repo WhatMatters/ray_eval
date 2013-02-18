@@ -12,7 +12,9 @@ setup(name='rayeval',
     ext_modules=[
         Extension('_rayeval',
             sources=['_rayevalmodule.c'],
-            extra_compile_args=['-O3'],
-            extra_link_args=['-O3'])
+            extra_compile_args=['-O3', '-msse4', '-fPIC',
+                '-Wshorten-64-to-32'],
+            extra_link_args=['-O3', '-msse4', '-fPIC',
+                '-Wshorten-64-to-32'])
     ],
     keywords='poker porn eval ray sluts math shit monte-carlo crap')

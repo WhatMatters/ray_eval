@@ -47,12 +47,12 @@ void init_random_int_52(void)
 	int i;
 	for (i = 1; i <= 52; i++)
 		RAND_MAX_DIV_52[i] = RAND_MAX / (i + 1);
-	srand(mix(clock(), time(NULL), getpid()));
+	srand((unsigned int) mix(clock(), time(NULL), getpid()));
 }
 
-// generate a random integer from 0 to k
 int random_int_52(int k) 
 {
+	// generate a random integer from 0 to k
     int r;
 	do 
 	{
@@ -184,21 +184,21 @@ int eval_monte_carlo_holdem(int N, int *board, int n_board,
 int eval_monte_carlo_omaha(int N, int *board, int n_board, 
 	int *pocket, int n_players, double *ev)
 {
-	const unsigned int pocket_perms[2][6] = {{0, 0, 0, 1, 1, 2}, {1, 2, 3, 2, 3, 3}};
-	const unsigned int n_pocket_perms = 6;
-	const unsigned int board_perms[10][3] = {
+	const int pocket_perms[2][6] = {{0, 0, 0, 1, 1, 2}, {1, 2, 3, 2, 3, 3}};
+	const int n_pocket_perms = 6;
+	const int board_perms[10][3] = {
 		{0, 1, 2}, // 3, 4, 5
 		{0, 1, 3}, {0, 2, 3}, {1, 2, 3}, // 4, 5
 		{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}; // 5
-	unsigned int n_board_perms = n_board == 5 ? 10 : n_board == 4 ? 4 : n_board == 3 ? 1 : -1;
+	int n_board_perms = n_board == 5 ? 10 : n_board == 4 ? 4 : n_board == 3 ? 1 : -1;
 	if (n_board_perms == -1)
 		return 1;
 
-	unsigned int mask[52], cards[52], n_mask = 0, n_available, 
+	int mask[52], cards[52], n_mask = 0, n_available, 
 		i, available_cards[52], sample[52];
 
-	memset(mask, 0, 52 * sizeof(unsigned int));
-	memset(cards, 0, 52 * sizeof(unsigned int));
+	memset(mask, 0, 52 * sizeof(int));
+	memset(cards, 0, 52 * sizeof(int));
 	memset(ev, 0, n_players * sizeof(double));
 	uint64_t deck = new_deck();
 
@@ -224,23 +224,23 @@ int eval_monte_carlo_omaha(int N, int *board, int n_board,
 
 	for (i = 0; i < N; ++i)
 	{
-		unsigned int best_score = 0;
-		unsigned int tied = 0;
+		int best_score = 0;
+		int tied = 0;
 		random_sample_52_ross(n_available, n_mask, sample);
-		unsigned int j = 0, nb = 0, np = 0;
+		int j = 0, nb = 0, np = 0;
 		for (j = 0; j < n_mask; ++j)
 			cards[mask[j]] = available_cards[sample[j]];
-		unsigned int *player_cards = cards + n_board;
-		unsigned int board_paths[10];
+		int *player_cards = cards + n_board;
+		int board_paths[10];
 		for (nb = 0; nb < n_board_perms; nb++)
 			board_paths[nb] = HR[HR[HR[53 + 
 				cards[board_perms[nb][0]]] + 
 					cards[board_perms[nb][1]]] + 
 						cards[board_perms[nb][2]]];
-		unsigned int scores[MAX_PLAYERS];
+		int scores[MAX_PLAYERS];
 		for (j = 0; j < n_players; ++j)
 		{
-			unsigned int score = 0;
+			int score = 0;
 			for (nb = 0; nb < n_board_perms; ++nb)
 				for (np = 0; np < n_pocket_perms; ++np)
 					// Aldanor: don't forget to use extra HR[...] for 5/6-card eval
@@ -275,7 +275,7 @@ int eval_monte_carlo_omaha(int N, int *board, int n_board,
 
 static PyObject *_rayeval_seed(PyObject *self, PyObject *args)
 {
-	unsigned long seed;
+	unsigned int seed;
   	if (!PyArg_ParseTuple(args, "i", &seed))
     	return NULL;
     srand(seed);
@@ -310,7 +310,8 @@ static PyObject *_rayeval_eval_mc(PyObject *self, PyObject *args)
 
 	char *game;
 	PyObject *py_board, *py_pocket, *py_ev;
-	int iterations, n_board, n_pocket, n_players, i, pocket_size = 2,
+	int n_board, n_pocket;
+	int iterations, n_players, i, pocket_size = 2,
 		board[5], pocket[4 * MAX_PLAYERS], is_omaha = 0;
 	double ev[MAX_PLAYERS];
 
@@ -330,8 +331,8 @@ static PyObject *_rayeval_eval_mc(PyObject *self, PyObject *args)
     if (iterations <= 0)
     	RAISE_EXCEPTION(PyExc_ValueError, "Iterations must be a positive integer.");
 
-    n_pocket = PyList_Size(py_pocket);
-    n_board = PyList_Size(py_board);
+    n_pocket = (int) PyList_Size(py_pocket);
+    n_board = (int) PyList_Size(py_board);
     n_players = n_pocket / pocket_size;
     if (n_players * pocket_size != n_pocket)
     	RAISE_EXCEPTION(PyExc_ValueError, "Invalid number of pocket cards.");
