@@ -17,8 +17,6 @@
 #define	ONE_PAIR			8
 #define	HIGH_CARD			9
 
-#define	RANK(x)				((x >> 8) & 0xF)
-
 static char *hand_rank_str[] = {
 	"",
 	"Straight Flush",
@@ -42,9 +40,6 @@ const char HandRanks[][16] = {"BAD!!","High Card","Pair","Two Pair","Three of a 
 
 #define min(a, b)  			(((a) < (b)) ? (a) : (b))
 #define max(a, b)  			(((a) > (b)) ? (a) : (b))
-
-const uint64_t ONE_64 = 1LLU;
-const uint64_t ZERO_64 = 0LLU;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -106,7 +101,7 @@ int find_card(int rank, int suit, int *deck)
 	for (i = 0; i < 52; i++)
 	{
 		c = deck[i];
-		if ((c & suit) && (RANK(c) == rank))
+		if ((c & suit) && (((c >> 8) & 0xF) == rank))
 			return i;
 	}
 	return -1;
@@ -143,11 +138,7 @@ short eval_5cards(int c1, int c2, int c3, int c4, int c5)
 short eval_5hand(int *hand)
 {
     int c1, c2, c3, c4, c5;
-    c1 = *hand++;
-    c2 = *hand++;
-    c3 = *hand++;
-    c4 = *hand++;
-    c5 = *hand;
+    c1 = *hand++; c2 = *hand++; c3 = *hand++; c4 = *hand++; c5 = *hand;
     return eval_5cards(c1, c2, c3, c4, c5);
 }
 
@@ -165,12 +156,7 @@ short eval_7hand(int *hand)
 	return best;
 }
 
-int64_t IDs[612978];
-
-int numIDs = 1;
 int n_cards = 0;
-int maxHR = 0;
-int64_t maxID = 0;
 
 // add a new card to this id
 int64_t make_id(int64_t id_in, int new_card) 
@@ -190,11 +176,10 @@ int64_t make_id(int64_t id_in, int new_card)
 
 	for (n_cards = 0; cards[n_cards]; n_cards++) 
 	{
-		n_suit[cards[n_cards] & 0xf]++;           // need to see if suit is significant
-		n_rank[(cards[n_cards] >> 4) & 0xf]++;	  // and rank to be sure we don't have 4!
-		if (n_cards)
-			if (cards[0] == cards[n_cards])	  // can't have the same card twice
-				done = 1;								  // if so need to get out after counting n_cards
+		n_suit[cards[n_cards] & 0xf]++; // need to see if suit is significant
+		n_rank[(cards[n_cards] >> 4) & 0xf]++; // and rank to be sure we don't have 4
+		if (n_cards && (cards[0] == cards[n_cards])) // can't have the same card twice
+			done = 1; // if so - need to quit after counting n_cards
 	}
 
 	if (done)
@@ -204,8 +189,8 @@ int64_t make_id(int64_t id_in, int new_card)
 	     
 	if (n_cards > 4)  
 		for (int rank = 1; rank < 14; rank++)
-			if (n_rank[rank] > 4)  // >= 4 of a rank => shouldn't do this one
-				return 0;   // can't have > 4 of a rank so return an invalid id
+			if (n_rank[rank] > 4) // >= 4 of a rank => shouldn't do this one
+				return 0; // can't have > 4 of a rank so return an invalid id
 	
 	// In the ID process, if we have
 	// 2s = 0x21, 3s = 0x31,.... Kc = 0xD4, Ac = 0xE4
@@ -218,8 +203,8 @@ int64_t make_id(int64_t id_in, int new_card)
 			if (n_suit[cards[n] & 0xf] < needsuited) // check n_suit to the number I need to have suits significant
 				cards[n] &= 0xf0; // if not enough - 0 out the suit - now this suit would be a 0 vs 1-4
 
-	// Sort Using XOR. Network for N=7, using Bose-Nelson Algorithm: Thanks to the thread!
-	#define SWAP(I,J) {if (cards[I] < cards[J]) {cards[I]^=cards[J]; cards[J]^=cards[I]; cards[I]^=cards[J];}}		
+	// sort using XOR (network for N = 7, using Bose-Nelson algorithm)
+	#define SWAP(I, J) {if (cards[I] < cards[J]) {cards[I] ^= cards[J]; cards[J] ^= cards[I]; cards[I] ^= cards[J];}}		
 
 	SWAP(0, 4);	SWAP(1, 5);	SWAP(2, 6);	SWAP(0, 2);		
 	SWAP(1, 3);	SWAP(4, 6);	SWAP(2, 4);	SWAP(3, 5);		
@@ -237,83 +222,74 @@ int64_t make_id(int64_t id_in, int new_card)
 		 ((int64_t) cards[6] << 48));    
 }
 
-int save_id(int64_t id) 
+int save_id(int64_t id, int64_t *ids, int64_t *max_id, int *num_ids) 
 {
 	if (id == 0) // don't use up a record for 0
 		return 0; 
 
-	if (id >= maxID) // take care of the most likely first goes on the end...
+	if (id >= (*max_id)) // take care of the most likely first goes on the end...
 	{           		
-		if (id > maxID) // greater than create new else it was the last one!
+		if (id > (*max_id)) // greater than create new else it was the last one!
 		{        
-			IDs[numIDs++] = id; // add the new id
-			maxID = id;
+			ids[(*num_ids)++] = id; // add the new id
+			(*max_id) = id;
 		}
-		return numIDs - 1;
+		return (*num_ids) - 1;
 	}
 
 	// pseudo bsearch algorithm
-	int low = 0;
-	int high = numIDs - 1;
+	int holdtest, low = 0, high = (*num_ids) - 1;
 	int64_t testval;
-	int holdtest;
 
 	while (high - low > 1) 
 	{
 		holdtest = (high + low + 1) / 2;
-		testval = IDs[holdtest] - id;
+		testval = ids[holdtest] - id;
 		if (testval > 0) 
 			high = holdtest;
 		else if (testval < 0) 
 			low = holdtest;
 		else 
-			return holdtest;   // got it!!
+			return holdtest; // got it
 	}
 	// I guess it couldn't be found so must be added to the current location (high)
 	// make space...  // don't expect this much!
-	memmove(&IDs[high + 1], &IDs[high], (numIDs - high) * sizeof(IDs[0]));  
+	memmove(&ids[high + 1], &ids[high], ((*num_ids) - high) * sizeof(ids[0]));  
 
-	IDs[high] = id;   // do the insert into the hole created
-	numIDs++;        
+	ids[high] = id;   // do the insert into the hole created
+	(*num_ids)++;        
 	return high;
 }
 
 int do_eval(int64_t id_in)
 {
-	// I guess I have some explaining to do here...  I used the Cactus Kevs Eval ref http://www.suffecool.net/poker/evaluator.html
-	// I Love the pokersource for speed, but I needed to do some tweaking to get it my way
-	// and Cactus Kevs stuff was easy to tweak ;-)  
-	int handrank = 0;
-	int cardnum;
-	int workcard;
-	int rank;
-	int suit;
-	int mainsuit = 20;      // just something that will never hit...  need to eliminate the main suit from the iterator
-	int suititerator = 0;
-	int holdrank;
-	int workcards[8];  // intentially keeping one as a 0 end
+	int n, handrank = 0, wcard, rank, suit, suititerator = 0, holdrank;
+	int mainsuit = 20; // just something that will never hit...  need to eliminate the main suit from the iterator
+	int wcards[8];  // work cards, intentially keep one as a 0 end
 	int holdcards[8];
 	int numevalcards = 0;
 
 	// See Cactus Kevs page for explainations for this type of stuff...
 	const int primes[] = { 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41 };
 	
-	memset(workcards, 0, sizeof(workcards));
+	memset(wcards, 0, sizeof(wcards));
 	memset(holdcards, 0, sizeof(holdcards));
 
-	if (id_in) {	 // if I have a good ID then do it...
-		for (cardnum = 0; cardnum < 7; cardnum++) {  // convert all 7 cards (0s are ok)
-			holdcards[cardnum] =  (int) ((id_in >> (8 * cardnum)) & 0xff); 
-			if (holdcards[cardnum] == 0) break;	// once I hit a 0 I know I am done
+	if (id_in) // if then id is good then do it
+	{
+		for (n = 0; n < 7; n++) // convert all 7 cards (0s are ok)
+		{  
+			holdcards[n] =  (int) ((id_in >> (8 * n)) & 0xff); 
+			if (holdcards[n] == 0) 
+				break;	// once I hit a 0 I know I am done
 			numevalcards++;						// if not 0 then count the card
-			if (suit = holdcards[cardnum] & 0xf) {	// find out what suit (if any) was significant
+			if ((suit = holdcards[n] & 0xf))	// find out what suit (if any) was significant
 				mainsuit = suit;					// and remember it
-			}
 		}
 
-
-		for (cardnum = 0; cardnum < numevalcards; cardnum++) {  // just have n_cards...
-			workcard = holdcards[cardnum];
+		for (n = 0; n < numevalcards; n++) // just have n_cards...
+		{  
+			wcard = holdcards[n];
 
 			// convert to cactus kevs way!!  ref http://www.suffecool.net/poker/evaluator.html
 			//   +--------+--------+--------+--------+
@@ -324,42 +300,48 @@ int do_eval(int64_t id_in)
 			//   cdhs = suit of card
 			//   b = bit turned on depending on rank of card
 
-			rank = (workcard >> 4) - 1;	 // my rank is top 4 bits 1-13 so convert
-			suit = workcard & 0xf;  // my suit is bottom 4 bits 1-4, order is different, but who cares?  
-			if (suit == 0) {		// if suit wasn't significant though...
+			rank = (wcard >> 4) - 1;	 // my rank is top 4 bits 1-13 so convert
+			suit = wcard & 0xf;  // my suit is bottom 4 bits 1-4, order is different, but who cares?  
+			if (suit == 0) // if suit wasn't significant though...
+			{		
 				suit = suititerator++;   // Cactus Kev needs a suit!
 				if (suititerator == 5)	 // loop through available suits
 					suititerator = 1;
-				if (suit == mainsuit) {   // if it was the sigificant suit...  Don't want extras!!
+				if (suit == mainsuit) // if it was the sigificant suit...  Don't want extras!!
+				{   
 					suit = suititerator++;    // skip it
 					if (suititerator == 5)	  // roll 1-4
 						suititerator = 1;
 				}
 			}
-			// now make Cactus Keys Card
-			workcards[cardnum] = primes[rank] | (rank << 8) | (1 << (suit + 11)) | (1 << (16 + rank));
+			// now make Cactus Kev card
+			wcards[n] = primes[rank] | (rank << 8) | (1 << (suit + 11)) | (1 << (16 + rank));
 		}
 
-		switch (numevalcards) {  // run Cactus Keys routines
-			case 5 :  holdrank = eval_5cards(workcards[0],workcards[1],workcards[2],workcards[3],workcards[4]);
-				      break;
-					  // if 6 cards I would like to find HandRank for them 
-					  // Cactus Key is 1 = highest - 7362 lowest I need to get the min for the permutations
-			case 6 :  holdrank = eval_5cards(workcards[0],workcards[1],workcards[2],workcards[3],workcards[4]);
-				      holdrank = min(holdrank, eval_5cards(workcards[0],workcards[1],workcards[2],workcards[3],workcards[5]));
-				      holdrank = min(holdrank, eval_5cards(workcards[0],workcards[1],workcards[2],workcards[4],workcards[5]));
-				      holdrank = min(holdrank, eval_5cards(workcards[0],workcards[1],workcards[3],workcards[4],workcards[5]));
-				      holdrank = min(holdrank, eval_5cards(workcards[0],workcards[2],workcards[3],workcards[4],workcards[5]));
-				      holdrank = min(holdrank, eval_5cards(workcards[1],workcards[2],workcards[3],workcards[4],workcards[5]));
-					  break;
-			case 7 : holdrank = eval_7hand(workcards);  
-				     break;
+		switch (numevalcards) // run Cactus Keys routines
+		{  
+			case 5:  
+				holdrank = eval_5cards(wcards[0],wcards[1],wcards[2],wcards[3],wcards[4]);
+				break;
+			// if 6 cards I would like to find HandRank for them 
+			// Cactus Key is 1 = highest - 7362 lowest I need to get the min for the permutations
+			case 6:  
+				holdrank = eval_5cards(wcards[0], wcards[1], wcards[2], wcards[3], wcards[4]);
+				holdrank = min(holdrank, eval_5cards(wcards[0], wcards[1], wcards[2], wcards[3], wcards[5]));
+				holdrank = min(holdrank, eval_5cards(wcards[0], wcards[1], wcards[2], wcards[4], wcards[5]));
+				holdrank = min(holdrank, eval_5cards(wcards[0], wcards[1], wcards[3], wcards[4], wcards[5]));
+				holdrank = min(holdrank, eval_5cards(wcards[0], wcards[2], wcards[3], wcards[4], wcards[5]));
+				holdrank = min(holdrank, eval_5cards(wcards[1], wcards[2], wcards[3], wcards[4], wcards[5]));
+				break;
+			case 7: 
+				holdrank = eval_7hand(wcards);  
+				break;
 			default : // problem!!  shouldn't hit this... 
-				      printf("    Problem with n_cards = %d!!\n", n_cards);
-					  break;
+				printf("    Problem with n_cards = %d!!\n", n_cards);
+				break;
 		}
 
-// I would like to change the format of Catus Kev's ret value to:
+		// change the format of Catus Kev's ret value to:
 		// hhhhrrrrrrrrrrrr   hhhh = 1 high card -> 9 straight flush
 		//                    r..r = rank within the above	1 to max of 2861
 		handrank = 7463 - holdrank;  // now the worst hand = 1
@@ -375,60 +357,59 @@ int do_eval(int64_t id_in)
 		else                      handrank = handrank - 7452 + 4096 * 9;  //   10 straight-flushes
 
 	}
-	return handrank;  // now a handrank that I like
+	return handrank;
 }
 
 int generate_handranks(const char *filename)
 {
-	int count = 0;
-	int card;
-	// static int _HR[32487834];   
+	int card, count = 0, num_ids = 1, n, id_slot, max_handrank = 0, handTypeSum[10], holdid;
+	int64_t ID, max_id = 0LLU;
 	int *_HR = malloc(32487834 * sizeof(int));
+	int64_t *ids = malloc(612978 * sizeof(int64_t));
 
-	int64_t ID;
-	int IDslot;
-
-	int handTypeSum[10];
-	
 	memset(handTypeSum, 0, sizeof(handTypeSum));  // init
-	memset(IDs, 0, sizeof(IDs));
-	memset(_HR, 0, sizeof(_HR));
-
-    int IDnum;
-	int holdid;
+	memset((long long *) ids, 0LLU, sizeof(ids));
+	memset((int *) _HR, 0, sizeof(_HR));
 
 	// as this loops through and find new combinations it adds them to the end
 	// I need this list to be stable when I set the handranks (next set)  (I do the insertion sort on new IDs these)
 	// so I had to get the IDs first and then set the handranks
-	for (IDnum = 0; IDs[IDnum] || IDnum == 0; IDnum++) {  // start at 1 so I have a zero catching entry (just in case)
-		for (card = 1; card < 53; card++) {	 // the ids above contain cards upto the current card.  Now add a new card 
-			ID = make_id(IDs[IDnum], card);   // get the new ID for it
-			if (n_cards < 7) holdid = save_id(ID);   // and save it in the list if I am not on the 7th card
+	for (n = 0; ids[n] || n == 0; n++) // start at 1 so I have a zero catching entry (just in case)
+	{  
+		for (card = 1; card < 53; card++) // the ids above contain cards upto the current card.  Now add a new card 
+		{	 
+			ID = make_id(ids[n], card);   // get the new ID for it
+			if (n_cards < 7) 
+				holdid = save_id(ID, ids, &max_id, &num_ids);   // and save it in the list if I am not on the 7th card
 		}
-		if ((IDnum + 2) % 19 == 0)
-			printf("\rGenerating card ids... %6d / 612977", IDnum + 1);	  // just to show the progress -- this will count up to  612976
+		if ((n + 2) % 19 == 0)
+			printf("\rGenerating card ids... %6d / 612977", n + 1);	  // just to show the progress -- this will count up to  612976
 	}
 	printf("\n");
 	// this is as above, but will not be adding anything to the ID list, so it is stable
-	for (IDnum = 0; IDs[IDnum] || IDnum == 0; IDnum++) {  // start at 1 so I have a zero catching entry (just in case)
+	for (n = 0; ids[n] || n == 0; n++) // start at 1 so I have a zero catching entry (just in case)
+	{  
 		for (card = 1; card < 53; card++) {
-			ID = make_id(IDs[IDnum], card);
-			if (n_cards < 7)  IDslot = save_id(ID) * 53 + 53;  // when in the index mode (< 7 cards) get the id to save
-			else IDslot = do_eval(ID);   // if I am at the 7th card, get the HandRank to save
-			maxHR = IDnum * 53 + card + 53;	// find where to put it 
-			_HR[maxHR] = IDslot;				// and save the pointer to the next card or the handrank
+			ID = make_id(ids[n], card);
+			if (n_cards < 7)
+				id_slot = save_id(ID, ids, &max_id, &num_ids) * 53 + 53;  // when in the index mode (< 7 cards) get the id to save
+			else
+				id_slot = do_eval(ID);   // if I am at the 7th card, get the HandRank to save
+			max_handrank = n * 53 + card + 53;	// find where to put it 
+			_HR[max_handrank] = id_slot;				// and save the pointer to the next card or the handrank
 		}
 
-		if (n_cards == 6 || n_cards == 7) {  
+		if (n_cards == 6 || n_cards == 7) 
+		{  
 			// an extra, If you want to know what the handrank when there is 5 or 6 cards
 			// you can just do HR[u3] or HR[u4] from below code for Handrank of the 5 or 6 card hand
-			_HR[IDnum * 53 + 53] = do_eval(IDs[IDnum]);  // this puts the above handrank into the array  
+			_HR[n * 53 + 53] = do_eval(ids[n]);  // this puts the above handrank into the array  
 		}
-		if ((IDnum + 2) % 19 == 0)
-			printf("\rSetting hand ranks...  %6d / 612977", IDnum + 1);	  // just to show the progress -- this will count up to  612976
+		if ((n + 2) % 19 == 0)
+			printf("\rSetting hand ranks...  %6d / 612977", n + 1);	  // just to show the progress -- this will count up to  612976
 	}
 
-	printf("\nThe highest hand rank: %d.\n", maxHR);
+	printf("\nThe highest hand rank: %d.\n", max_handrank);
 
 	int c0, c1, c2, c3, c4, c5, c6;
 	int u0, u1, u2, u3, u4, u5;
@@ -462,17 +443,15 @@ int generate_handranks(const char *filename)
 	printf("\nTotal hands = %d\n", count);
 
 	FILE * fout = fopen(filename, "wb");
-	if (!fout)
+	int result = 1;
+	if (fout)
 	{
-		free(_HR);
-		_HR = 0; 
-		return 1;
+		result = 0;
+		fwrite(_HR, sizeof(_HR), 1, fout);
+		fclose(fout);
 	}
-	fwrite(_HR, sizeof(_HR), 1, fout);
-	fclose(fout);
-	free(_HR);
-	_HR = 0;
-	return 0;
+	free(_HR); free(ids); _HR = 0; ids = 0;
+	return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -554,7 +533,7 @@ void random_sample_52_ross(int n, int k, int *out)
 
 void extract_cards(uint64_t *deck, int card)
 {
-	*deck ^= (ONE_64 << card);
+	*deck ^= (1LLU << card);
 }
 
 void get_cards(uint64_t deck, int *cards, int shift)
@@ -562,7 +541,7 @@ void get_cards(uint64_t deck, int *cards, int shift)
 	int i, pos = 0;
 
 	for (i = 0; i < 52; i++)
-		if (deck & (ONE_64 << i))
+		if (deck & (1LLU << i))
 			cards[pos++] = i + shift;
 }
 
@@ -572,7 +551,7 @@ uint64_t new_deck()
 	int i;
 
 	for (i = 0; i < 52; i++)
-		deck |= (ONE_64 << i);
+		deck |= (1LLU << i);
 	return deck;
 }
 
