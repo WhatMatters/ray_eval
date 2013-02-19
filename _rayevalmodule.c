@@ -337,8 +337,7 @@ int do_eval(int64_t id_in)
 				holdrank = eval_7hand(wcards);  
 				break;
 			default : // problem!!  shouldn't hit this... 
-				printf("    Problem with n_cards = %d!!\n", n_cards);
-				break;
+				return -1;
 		}
 
 		// change the format of Catus Kev's ret value to:
@@ -395,6 +394,11 @@ int generate_handranks(const char *filename)
 				id_slot = save_id(ID, ids, &max_id, &num_ids) * 53 + 53;  // when in the index mode (< 7 cards) get the id to save
 			else
 				id_slot = do_eval(ID);   // if I am at the 7th card, get the HandRank to save
+			if (id_slot == -1)
+			{
+				printf("    Error: problem with n_cards = %d.\n", n_cards);
+				free(_HR); free(ids); _HR = 0; ids = 0; return 1;
+			}
 			max_handrank = n * 53 + card + 53;	// find where to put it 
 			_HR[max_handrank] = id_slot;				// and save the pointer to the next card or the handrank
 		}
@@ -403,7 +407,13 @@ int generate_handranks(const char *filename)
 		{  
 			// an extra, If you want to know what the handrank when there is 5 or 6 cards
 			// you can just do HR[u3] or HR[u4] from below code for Handrank of the 5 or 6 card hand
-			_HR[n * 53 + 53] = do_eval(ids[n]);  // this puts the above handrank into the array  
+			int value = do_eval(ids[n]);
+			if (value == -1)
+			{
+				printf("    Error: problem with n_cards = %d.\n", n_cards);
+				free(_HR); free(ids); _HR = 0; ids = 0; return 1;
+			}
+			_HR[n * 53 + 53] = value;  // this puts the above handrank into the array  
 		}
 		if ((n + 2) % 19 == 0)
 			printf("\rSetting hand ranks...  %6d / 612977", n + 1);	  // just to show the progress -- this will count up to  612976
@@ -474,8 +484,6 @@ int *load_handranks(const char *filename)
 		return NULL;
 }
 
-static int RAND_MAX_DIV_52[53];
-
 unsigned long mix(unsigned long a, unsigned long b, unsigned long c)
 {
     a = a - b;  a = a - c;  a = a^(c >> 13);
@@ -490,6 +498,8 @@ unsigned long mix(unsigned long a, unsigned long b, unsigned long c)
     return c;
 }
 
+static int RAND_MAX_DIV_52[53];
+
 void init_random_int_52(void)
 {
 	int i;
@@ -500,20 +510,10 @@ void init_random_int_52(void)
 
 int random_int_52(int k) 
 {
-	// generate a random integer from 0 to k
     int r;
-	do 
-	{
-		r = rand() / RAND_MAX_DIV_52[k];
-    } while (r > k);
-    return r;
+	do { r = rand() / RAND_MAX_DIV_52[k]; } while (r > k);
+    return r; // 0 to k
 }
-
-const int DECK_52[52] = {
-	 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12,
-	13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-	26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
-	39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51};
 
 inline void swap(int *x, int *y)
 {
@@ -525,6 +525,11 @@ inline void swap(int *x, int *y)
 void random_sample_52_ross(int n, int k, int *out)
 {
 	// Ross algorithm modified to work in-place (C) Aldanor
+	const int DECK_52[52] = {
+		 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12,
+		13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+		26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
+		39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51};
 	memcpy(out, DECK_52, sizeof(DECK_52));
 	int i;
 	for (i = 0; i < k; i++)
@@ -539,7 +544,6 @@ void extract_cards(uint64_t *deck, int card)
 void get_cards(uint64_t deck, int *cards, int shift)
 {
 	int i, pos = 0;
-
 	for (i = 0; i < 52; i++)
 		if (deck & (1LLU << i))
 			cards[pos++] = i + shift;
@@ -549,7 +553,6 @@ uint64_t new_deck()
 {
 	uint64_t deck = 0;
 	int i;
-
 	for (i = 0; i < 52; i++)
 		deck |= (1LLU << i);
 	return deck;
@@ -787,8 +790,8 @@ static PyObject *_rayeval_eval_mc(PyObject *self, PyObject *args)
     n_players = n_pocket / pocket_size;
     if (n_players * pocket_size != n_pocket)
     	RAISE_EXCEPTION(PyExc_ValueError, "Invalid number of pocket cards.");
-    if (n_board != 5)
-    	RAISE_EXCEPTION(PyExc_ValueError, "Board must contain five cards.");
+    if (n_board != 3 && n_board != 4 && n_board != 5)
+    	RAISE_EXCEPTION(PyExc_ValueError, "Board must contain 3-5 cards.");
 
     for (i = 0; i < n_pocket; i++)
     {
