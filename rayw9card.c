@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <Python.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <stdint.h>
 #include "arrays.h"
 
 #define MAX_PLAYERS 		10
@@ -186,9 +188,10 @@ int64_t make_id(int64_t id_in, int new_card)
 		return 0; // duplicate of another card (ignore this one)    
 	
 	needsuited = n_cards - 2; // for suit to be significant - need to have n-2 of same suit
-	     
+	
+	int rank;
 	if (n_cards > 4)  
-		for (int rank = 1; rank < 14; rank++)
+		for (rank = 1; rank < 14; rank++)
 			if (n_rank[rank] > 4) // >= 4 of a rank => shouldn't do this one
 				return 0; // can't have > 4 of a rank so return an invalid id
 	
@@ -447,7 +450,8 @@ int generate_handranks(const char *filename)
 		}
 	}
 
-	for (int i = 0; i <= 9; i++)
+	int i;
+	for (i = 0; i <= 9; i++)
 		printf("\n%16s: %d", HandRanks[i], handTypeSum[i]);
 	
 	printf("\nTotal hands = %d\n", count);
@@ -479,25 +483,6 @@ int *load_handranks(const char *filename)
 		fread(_HR, sizeof(_HR), 1, f);
 		fclose(f);
 		return _HR;
-	}
-	else
-		return NULL;
-}
-
-static int *HR9 = 0;
-
-int *load_handranks_9(const char *filename)
-{
-	static int _HR9[620518328]; 	
-	FILE *f = fopen(filename, "rb");
-	if (f)
-	{
-		fread(_HR9, sizeof(_HR9), 1, f);
-		fclose(f);
-		int i;
-		for (i = 1000; i < 1100; i++)
-			printf("%d ", _HR9[i]);
-		return _HR9;
 	}
 	else
 		return NULL;
@@ -644,80 +629,6 @@ int eval_monte_carlo_holdem(int N, int *board, int n_board,
 	return 0;
 }
 
-int eval_monte_carlo_omaha_9(int N, int *board, int n_board, 
-	int *pocket, int n_players, double *ev)
-{
-	int mask[52], cards[52], n_cards = 0, n_mask = 0, n_available, i, j, k;
-	memset(mask, 0, 52 * sizeof(int));
-	memset(cards, 0, 52 * sizeof(int));
-	memset(ev, 0, n_players * sizeof(double));
-	uint64_t deck = new_deck();
-	int available_cards[52];
-	if (n_board != 3 && n_board != 4 && n_board != 5)
-		return 1;
-	for (i = 0; i < n_board; i++)
-	{
-		if (board[i] == 255)
-			mask[n_mask++] = n_cards;
-		else
-			extract_cards(&deck, board[i]);
-		cards[n_cards++] = board[i] + 1; // convert 0-51 to 1-52
-	}
-	for (i = 0; i < 4 * n_players; i++)
-	{
-		if (pocket[i] == 255)
-			mask[n_mask++] = n_cards;
-		else
-			extract_cards(&deck, pocket[i]);
-		cards[n_cards++] = pocket[i] + 1; // convert 0-51 to 1-52
-	}
-	n_available = 52 - n_board - 4 * n_players + n_mask;
-	get_cards(deck, available_cards, 1); // convert 0-51 to 1-52
-	for (i = 0; i < N; i++)
-	{
-		int sample[52], scores[MAX_PLAYERS], best_score = -1, tied = 0;
-		random_sample_52_ross(n_available, n_mask, sample);
-		for (j = 0; j < n_mask; j++)
-			cards[mask[j]] = available_cards[sample[j]];
-		int path = 53;
-		for (j = 0; j < n_board; j++)
-			path = HR9[path + cards[j]];
-		int *player_cards = cards + n_board;
-		for (k = 0; k < n_players; k++)
-		{
-			// int score = HR9[HR9[HR9[HR9[
-			// 	path + 
-			// 	player_cards[0]] + 
-			// 	player_cards[1]] +
-			// 	player_cards[2]] +
-			// 	player_cards[3]];
-			int player_path = HR9[HR9[HR9[HR9[53 + player_cards[0]]
-				+ player_cards[1]]
-				+ player_cards[2]]
-				+ player_cards[3]], score = 0;
-			for (j = 0; j < n_board; j++)
-				player_path = HR9[player_path + cards[j]];
-			score = player_path;
-			scores[k] = score;
-			if (score > best_score)
-			{
-				best_score = score;
-				tied = 1;
-			}
-			else if (score == best_score)
-				tied++;
-			player_cards += 4;
-		}
-		double delta_ev = 1.0 / tied;
-		for (k = 0; k < n_players; k++)
-			if (scores[k] == best_score)
-				ev[k] += delta_ev;
-	}
-	for (k = 0; k < n_players; k++)
-		ev[k] /= (double)N;
-	return 0;
-}
-
 int eval_monte_carlo_omaha(int N, int *board, int n_board, 
 	int *pocket, int n_players, double *ev)
 {
@@ -805,161 +716,447 @@ int eval_monte_carlo_omaha(int N, int *board, int n_board,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//							PYTHON WRAPPERS
+//							9 CARD LOOKUP TABLE
 ////////////////////////////////////////////////////////////////////////////////
 
-#define RAISE_EXCEPTION(exception, message) {PyErr_SetString((exception), (message)); return NULL;}
+// int n_cards = 0;
 
-static PyObject *_rayeval_seed(PyObject *self, PyObject *args)
+// add a new card to this id
+int64_t make_id_9(int64_t id_in, int new_card) 
 {
-	unsigned int seed;
-  	if (!PyArg_ParseTuple(args, "i", &seed))
-    	return NULL;
-    srand(seed);
-	Py_RETURN_NONE;
-}
+	int n_suit[4 + 1], n_rank[13 + 1], n, done = 0, needsuited;
+	int cards[10];  // intentially keep an extra one as 0 end
+	
+	memset(cards, 0, sizeof(cards));
+	memset(n_rank, 0, sizeof(n_rank));
+	memset(n_suit, 0, sizeof(n_suit));
+	
+	for (n = 0; n < 8; n++) // can't have more than 8 cards
+		cards[n + 1] = (int) ((id_in >> (7 * n)) & 0x7f);  // leave the 0 index for new card
 
+	new_card--;  // 1-52 -> 0-51
+	cards[0] = (((new_card >> 2) + 1) << 3) + (new_card & 3) + 1;  // add next card formats card to rrrr00ss
 
-static PyObject *_rayeval_load_handranks(PyObject *self, PyObject *args)
-{
-	char *filename;
-  	if (!PyArg_ParseTuple(args, "s", &filename))
-    	return NULL;
-    if (!HR)
-	    if (!(HR = load_handranks(filename)))
-	    	RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to load hand ranks from file.");
-	Py_RETURN_NONE;
-}
-
-static PyObject *_rayeval_load_handranks_9(PyObject *self, PyObject *args)
-{
-	char *filename;
-  	if (!PyArg_ParseTuple(args, "s", &filename))
-    	return NULL;
-    if (!HR9)
-	    if (!(HR9 = load_handranks_9(filename)))
-	    	RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to load hand ranks [9] from file.");
-	Py_RETURN_NONE;
-}
-
-static PyObject *_rayeval_generate_handranks(PyObject *self, PyObject *args)
-{
-	char *filename;
-  	if (!PyArg_ParseTuple(args, "s", &filename))
-    	return NULL;
-	if (generate_handranks(filename))
-		RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to generate hand ranks file.");
-	Py_RETURN_NONE;
-}
-
-/*
-INPUT:
-	game: "omaha" | "holdem"
-	board: list (int)
-	pockets: list (int)
-	iterations: int
-OUTPUT:
-	ev: list (doble)
-*/
-static PyObject *_rayeval_eval_mc(PyObject *self, PyObject *args)
-{
-	if (!HR)
-		RAISE_EXCEPTION(PyExc_RuntimeError, "Please call load_handranks() first.");
-
-	char *game;
-	PyObject *py_board, *py_pocket, *py_ev;
-	int n_board, n_pocket;
-	int iterations, n_players, i, pocket_size = 2,
-		board[5], pocket[4 * MAX_PLAYERS], is_omaha = 0, omaha_9 = 0;
-	double ev[MAX_PLAYERS];
-
-	if (!PyArg_ParseTuple(args, "sOOi", &game, &py_board, &py_pocket, &iterations))
-		return NULL;
-
-	if (!strcmp(game, "omaha"))
-		is_omaha = 1;
-	else if (!strcmp(game, "omaha_9"))
+	for (n_cards = 0; cards[n_cards]; n_cards++) 
 	{
-		is_omaha = 1;
-		omaha_9 = 1;
+		n_suit[cards[n_cards] & 0x7]++; // need to see if suit is significant
+		n_rank[(cards[n_cards] >> 3) & 0xf]++; // and rank to be sure we don't have 4
+		if (n_cards && (cards[0] == cards[n_cards])) // can't have the same card twice
+			done = 1; // if so - need to quit after counting n_cards
 	}
-	else if (strcmp(game, "holdem"))
-    	RAISE_EXCEPTION(PyExc_ValueError, "Game type must be holdem or omaha.");
-    pocket_size += 2 * is_omaha;
 
-  	if (!PyList_Check(py_board)) 
-    	RAISE_EXCEPTION(PyExc_TypeError, "Board must be a list.");
-  	if (!PyList_Check(py_pocket)) 
-    	RAISE_EXCEPTION(PyExc_TypeError, "Pockets must be a list.");
-    if (iterations <= 0)
-    	RAISE_EXCEPTION(PyExc_ValueError, "Iterations must be a positive integer.");
+	if (done)
+		return 0; // duplicate of another card (ignore this one)    
+	
+	needsuited = n_cards - 2; // for suit to be significant - need to have n-2 of same suit
 
-    n_pocket = (int) PyList_Size(py_pocket);
-    n_board = (int) PyList_Size(py_board);
-    n_players = n_pocket / pocket_size;
-    if (n_players * pocket_size != n_pocket)
-    	RAISE_EXCEPTION(PyExc_ValueError, "Invalid number of pocket cards.");
-    if (n_board != 3 && n_board != 4 && n_board != 5)
-    	RAISE_EXCEPTION(PyExc_ValueError, "Board must contain 3-5 cards.");
+	int rank;	     
+	if (n_cards > 4)  
+		for (rank = 1; rank < 14; rank++)
+			if (n_rank[rank] > 4) // >= 4 of a rank => shouldn't do this one
+				return 0; // can't have > 4 of a rank so return an invalid id
+	
+	// In the ID process, if we have
+	// 2s = 0x21, 3s = 0x31,.... Kc = 0xD4, Ac = 0xE4
+	// then it allows us to sort in rank then suit order
+	
+	// if we don't have at least 2 cards of the same suit for 4, we make this card suit 0.
+	
+	if (needsuited > 1)
+		for (n = 0; n < n_cards; n++) // for each card
+			if (n_suit[cards[n] & 0x7] < needsuited) // check n_suit to the number I need to have suits significant
+				cards[n] &= 0x78; // if not enough - 0 out the suit - now this suit would be a 0 vs 1-4
 
-    for (i = 0; i < n_pocket; i++)
-    {
-    	PyObject *item = PyList_GetItem(py_pocket, i);
-    	if (!PyInt_Check(item))
-	    	RAISE_EXCEPTION(PyExc_TypeError, "Pocket cards must be integers.");
-    	pocket[i] = (int) PyInt_AsLong(item);
-    	if ((pocket[i] < 0 || pocket[i] > 51) && pocket[i] != 255)
-	    	RAISE_EXCEPTION(PyExc_TypeError, "Pocket cards must be 0-51 or 255.");
-    }
+	// sort using XOR (network for N = 7, using Bose-Nelson algorithm)
+	#define SWAP(I, J) {if (cards[I] < cards[J]) {cards[I] ^= cards[J]; cards[J] ^= cards[I]; cards[I] ^= cards[J];}}		
 
-    for (i = 0; i < n_board; i++)
-    {
-    	PyObject *item = PyList_GetItem(py_board, i);
-    	if (!PyInt_Check(item))
-	    	RAISE_EXCEPTION(PyExc_TypeError, "Board cards must be integers.");
-    	board[i] = (int) PyInt_AsLong(item);
-    	if ((board[i] < 0 || board[i] > 51) && board[i] != 255)
-	    	RAISE_EXCEPTION(PyExc_TypeError, "Board cards must be 0-51 or 255.");
-    }
+	// SWAP(0, 4);	SWAP(1, 5);	SWAP(2, 6);	SWAP(0, 2);		
+	// SWAP(1, 3);	SWAP(4, 6);	SWAP(2, 4);	SWAP(3, 5);		
+	// SWAP(0, 1);	SWAP(2, 3);	SWAP(4, 5);	SWAP(1, 4);		
+	// SWAP(3, 6);	SWAP(1, 2);	SWAP(3, 4);	SWAP(5, 6);	
 
-   	if (is_omaha)
-   	{
-   		if (omaha_9)
-   			eval_monte_carlo_omaha_9(iterations, board, n_board, pocket, n_players, ev);
-   		else
-   			eval_monte_carlo_omaha(iterations, board, n_board, pocket, n_players, ev);
-   	}
-   	else
-   		eval_monte_carlo_holdem(iterations, board, n_board, pocket, n_players, ev);
+	// Bose-Nelson, N=4
+	SWAP(0, 1); SWAP(2, 3);
+	SWAP(0, 2); SWAP(1, 3);
+	SWAP(1, 2);
 
-   	py_ev = PyList_New(n_players);
-   	for (i = 0; i < n_players; i++)
-   		PyList_SET_ITEM(py_ev, (Py_ssize_t) i, PyFloat_FromDouble(ev[i]));
+	// Bose-Nelson, N=5
+	SWAP(4, 5); SWAP(7, 8);
+	SWAP(6, 8);
+	SWAP(6, 7); SWAP(5, 8);
+	SWAP(4, 7);
+	SWAP(4, 6); SWAP(5, 8);
+	SWAP(5, 6);
 
-   	return py_ev;
+	// store cards in bytes --66554433221100	 
+	// the resulting ID is a 64 bit value with each card represented by 7 bits.
+	// Aldanor: 7 bits! 7 bits! 7 fucking bits
+	return ((int64_t) cards[0] +
+		 ((int64_t) cards[1] << 7) +
+		 ((int64_t) cards[2] << 14) + 
+		 ((int64_t) cards[3] << 21) +
+		 ((int64_t) cards[4] << 28) +
+		 ((int64_t) cards[5] << 35) +
+		 ((int64_t) cards[6] << 42) +
+		 ((int64_t) cards[7] << 49) +
+		 ((int64_t) cards[8] << 56));    
 }
 
-////////////////////////////////////////////////////////////////////////////////
-//							MODULE INITIALIZATION
-////////////////////////////////////////////////////////////////////////////////
-
-static PyObject *_rayeval_test(PyObject *self, PyObject *args)
+int save_id_9(int64_t id, int64_t *ids, int64_t *max_id, int *num_ids) 
 {
-	Py_RETURN_NONE;
+	if (id == 0) // don't use up a record for 0
+		return 0; 
+
+	if (id >= (*max_id)) // take care of the most likely first goes on the end...
+	{           		
+		if (id > (*max_id)) // greater than create new else it was the last one!
+		{        
+			ids[(*num_ids)++] = id; // add the new id
+			(*max_id) = id;
+		}
+		return (*num_ids) - 1;
+	}
+
+	// pseudo bsearch algorithm
+	int holdtest, low = 0, high = (*num_ids) - 1;
+	int64_t testval;
+
+	while (high - low > 1) 
+	{
+		holdtest = (high + low + 1) / 2;
+		testval = ids[holdtest] - id;
+		if (testval > 0) 
+			high = holdtest;
+		else if (testval < 0) 
+			low = holdtest;
+		else 
+			return holdtest; // got it
+	}
+	// I guess it couldn't be found so must be added to the current location (high)
+	// make space...  // don't expect this much!
+	memmove(&ids[high + 1], &ids[high], ((*num_ids) - high) * sizeof(ids[0]));  
+
+	ids[high] = id;   // do the insert into the hole created
+	(*num_ids)++;        
+	return high;
 }
 
-static PyMethodDef _rayeval_methods[] = {
-	{"seed", (PyCFunction) _rayeval_seed, METH_VARARGS, ""},
-	{"generate_handranks", (PyCFunction) _rayeval_generate_handranks, METH_VARARGS, ""},
-	{"load_handranks", (PyCFunction) _rayeval_load_handranks, METH_VARARGS, ""},
-	{"load_handranks_9", (PyCFunction) _rayeval_load_handranks_9, METH_VARARGS, ""},
-	{"eval_mc", (PyCFunction) _rayeval_eval_mc, METH_VARARGS, ""},
-	{"test", (PyCFunction) _rayeval_test, METH_NOARGS, ""},
-	{NULL, NULL, 0, NULL}
-};
-
-PyMODINIT_FUNC init_rayeval(void)
+// pocket first (4), then board (3-5)
+int eval_789(int *cards, int n)
 {
-	init_random_int_52();
-	Py_InitModule("_rayeval", _rayeval_methods);
+	// Aldanor: fuck me...
+	const int pocket_perms[2][6] = {{0, 0, 0, 1, 1, 2}, {1, 2, 3, 2, 3, 3}};
+	const int n_pocket_perms = 6;
+	const int board_perms[10][3] = {
+		{0, 1, 2}, // 3, 4, 5
+		{0, 1, 3}, {0, 2, 3}, {1, 2, 3}, // 4, 5
+		{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}; // 5
+	int n_board_perms = n == 9 ? 10 : n == 8 ? 4 : n == 7 ? 1 : -1;
+	if (n_board_perms == -1)
+		return -1;
+
+	int np, nb, best = 8191;
+	for (np = 0; np < n_pocket_perms; np++)
+	{
+		for (nb = 0; nb < n_board_perms; nb++)
+		{
+			int subhand[5];
+			subhand[0] = cards[pocket_perms[0][np]];
+			subhand[1] = cards[pocket_perms[1][np]];
+			subhand[2] = cards[4 + board_perms[nb][0]];
+			subhand[3] = cards[4 + board_perms[nb][1]];
+			subhand[4] = cards[4 + board_perms[nb][2]];
+			int q = eval_5hand(subhand);
+			if (q < best)
+				best = q;
+		}
+	}
+
+	return best;
+}
+
+int do_eval_9(int64_t id_in)
+{
+	// very important shit: int64 is split into nine 7-bit parts (63 total).
+	// higher 4 bits is card rank (1-13)
+	// lower 3 bits encode suit, 0 = not important, then 1, 2, 3, 4
+	// suit has to be later converted to 0, 1, 2, 4, 8
+	int n, handrank = 0, wcard, rank, suit, suititerator = 0, holdrank;
+	int mainsuit = 20; // just something that will never hit...  need to eliminate the main suit from the iterator
+	int wcards[10];  // work cards, intentially keep one as a 0 end
+	int holdcards[10];
+	int numevalcards = 0;
+
+	// See Cactus Kevs page for explainations for this type of stuff...
+	const int primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41};
+	
+	memset(wcards, 0, sizeof(wcards));
+	memset(holdcards, 0, sizeof(holdcards));
+
+	if (id_in) // if then id is good then do it
+	{
+		for (n = 0; n < 9; n++) // convert all 7 cards (0s are ok)
+		{  
+			holdcards[n] =  (int) ((id_in >> (7 * n)) & 0x7f); 
+			if (holdcards[n] == 0) 
+				break;	// once I hit a 0 I know I am done
+			numevalcards++;						// if not 0 then count the card
+			if ((suit = holdcards[n] & 0x7))	// find out what suit (if any) was significant
+				mainsuit = suit;					// and remember it
+		}
+
+		for (n = 0; n < numevalcards; n++) // just have n_cards...
+		{  
+			wcard = holdcards[n];
+
+			// convert to cactus kevs way!!  ref http://www.suffecool.net/poker/evaluator.html
+			//   +--------+--------+--------+--------+
+			//   |xxxbbbbb|bbbbbbbb|cdhsrrrr|xxpppppp|
+			//   +--------+--------+--------+--------+
+			//   p = prime number of rank (deuce=2,trey=3,four=5,five=7,...,ace=41)
+			//   r = rank of card (deuce=0,trey=1,four=2,five=3,...,ace=12)
+			//   cdhs = suit of card
+			//   b = bit turned on depending on rank of card
+
+			rank = (wcard >> 3) - 1;	 // my rank is top 4 bits 1-13 so convert
+			suit = wcard & 0x7;  // my suit is bottom 4 bits 1-4, order is different, but who cares? 
+
+			// convert two bits to 4
+			// if (suit != 0)
+				// suit = 1 << (suit - 1) // Aldanor
+
+			if (suit == 0) // if suit wasn't significant though...
+			{		
+				suit = suititerator++;   // Cactus Kev needs a suit!
+				if (suititerator == 5)	 // loop through available suits
+					suititerator = 1;
+				if (suit == mainsuit) // if it was the sigificant suit...  Don't want extras!!
+				{   
+					suit = suititerator++;    // skip it
+					if (suititerator == 5)	  // roll 1-4
+						suititerator = 1;
+				}
+			}
+			// now make Cactus Kev card
+			wcards[n] = primes[rank] | (rank << 8) | (1 << (suit + 11)) | (1 << (16 + rank));
+		}
+
+		if (numevalcards < 7 || numevalcards > 9)
+			return -1;
+
+		holdrank = eval_789(wcards, numevalcards);
+		if (holdrank == -1)
+			return -1;
+
+		// switch (numevalcards) // run Cactus Keys routines
+		// {  
+		// 	case 5:  
+		// 		holdrank = eval_5cards(wcards[0],wcards[1],wcards[2],wcards[3],wcards[4]);
+		// 		break;
+		// 	// if 6 cards I would like to find HandRank for them 
+		// 	// Cactus Key is 1 = highest - 7362 lowest I need to get the min for the permutations
+		// 	case 6:  
+		// 		holdrank = eval_5cards(wcards[0], wcards[1], wcards[2], wcards[3], wcards[4]);
+		// 		holdrank = min(holdrank, eval_5cards(wcards[0], wcards[1], wcards[2], wcards[3], wcards[5]));
+		// 		holdrank = min(holdrank, eval_5cards(wcards[0], wcards[1], wcards[2], wcards[4], wcards[5]));
+		// 		holdrank = min(holdrank, eval_5cards(wcards[0], wcards[1], wcards[3], wcards[4], wcards[5]));
+		// 		holdrank = min(holdrank, eval_5cards(wcards[0], wcards[2], wcards[3], wcards[4], wcards[5]));
+		// 		holdrank = min(holdrank, eval_5cards(wcards[1], wcards[2], wcards[3], wcards[4], wcards[5]));
+		// 		break;
+		// 	case 7: 
+		// 		holdrank = eval_7hand(wcards);  
+		// 		break;
+		// 	default : // problem!!  shouldn't hit this... 
+		// 		return -1;
+		// }
+
+		// change the format of Catus Kev's ret value to:
+		// hhhhrrrrrrrrrrrr   hhhh = 1 high card -> 9 straight flush
+		//                    r..r = rank within the above	1 to max of 2861
+		handrank = 7463 - holdrank;  // now the worst hand = 1
+		
+		if      (handrank < 1278) handrank = handrank -    0 + 4096 * 1;  // 1277 high card
+		else if (handrank < 4138) handrank = handrank - 1277 + 4096 * 2;  // 2860 one pair
+		else if (handrank < 4996) handrank = handrank - 4137 + 4096 * 3;  //  858 two pair
+		else if (handrank < 5854) handrank = handrank - 4995 + 4096 * 4;  //  858 three-kind
+		else if (handrank < 5864) handrank = handrank - 5853 + 4096 * 5;  //   10 straights
+		else if (handrank < 7141) handrank = handrank - 5863 + 4096 * 6;  // 1277 flushes
+		else if (handrank < 7297) handrank = handrank - 7140 + 4096 * 7;  //  156 full house
+		else if (handrank < 7453) handrank = handrank - 7296 + 4096 * 8;  //  156 four-kind
+		else                      handrank = handrank - 7452 + 4096 * 9;  //   10 straight-flushes
+
+	}
+	return handrank;
+}
+
+#define HR9_SIZE 	620518328
+#define ID9_SIZE 	11707876
+
+int generate_handranks_9(const char *filename)
+{
+
+	int card, num_ids = 1, n, id_slot, max_handrank = 0, handTypeSum[10], holdid;
+	int64_t ID, max_id = 0LLU, count = 0LLU;
+	int *_HR = malloc(HR9_SIZE * sizeof(int));
+	int64_t *ids = malloc(ID9_SIZE * sizeof(int64_t));
+
+	memset(handTypeSum, 0, sizeof(handTypeSum));
+	memset((int64_t *) ids, 0LL, ID9_SIZE * sizeof(int64_t));
+	memset((int *) _HR, 0, HR9_SIZE * sizeof(int));
+
+	// as this loops through and find new combinations it adds them to the end
+	// I need this list to be stable when I set the handranks (next set)  (I do the insertion sort on new IDs these)
+	// so I had to get the IDs first and then set the handranks
+	for (n = 0; ids[n] || n == 0; n++) // start at 1 so I have a zero catching entry (just in case)
+	{  
+		for (card = 1; card < 53; card++) // the ids above contain cards upto the current card.  Now add a new card 
+		{	 
+			ID = make_id_9(ids[n], card);   // get the new ID for it
+			if (n_cards < 9) 
+				holdid = save_id_9(ID, ids, &max_id, &num_ids);   // and save it in the list if I am not on the 9th card
+		}
+		if ((n + 2) % 19 == 0)
+			printf("\rGenerating card ids... %8d / ???", n + 1);	  // just to show the progress -- this will count up to ???
+	}
+	printf("\n");
+	// this is as above, but will not be adding anything to the ID list, so it is stable
+	for (n = 0; ids[n] || n == 0; n++) // start at 1 so I have a zero catching entry (just in case)
+	{  
+		for (card = 1; card < 53; card++) {
+			ID = make_id_9(ids[n], card);
+			if (n_cards < 9)
+				id_slot = save_id_9(ID, ids, &max_id, &num_ids) * 53 + 53;  // when in the index mode (< 9 cards) get the id to save
+			else
+				id_slot = do_eval_9(ID);   // if I am at the 7th card, get the HandRank to save
+			if (id_slot == -1)
+			{
+				printf("    Error: problem with n_cards = %d.\n", n_cards);
+				free(_HR); free(ids); _HR = 0; ids = 0; return 1;
+			}
+			max_handrank = n * 53 + card + 53;	// find where to put it 
+			_HR[max_handrank] = id_slot;				// and save the pointer to the next card or the handrank
+		}
+
+		if (n_cards == 8 || n_cards == 9) 
+		{  
+			// an extra, If you want to know what the handrank when there is 7 or 8 cards
+			// you can just do HR[u3] or HR[u4] from below code for Handrank of the 7 or 8 card hand
+			int value = do_eval_9(ids[n]);
+			if (value == -1)
+			{
+				printf("    Error: problem with n_cards = %d.\n", n_cards);
+				free(_HR); free(ids); _HR = 0; ids = 0; return 1;
+			}
+			_HR[n * 53 + 53] = value;  // this puts the above handrank into the array  
+		}
+		if ((n + 2) % 19 == 0)
+			printf("\rSetting hand ranks...  %8d / ???", n + 1);	  // just to show the progress -- this will count up to  612976
+	}
+
+	printf("\nThe highest hand rank: %d.\n", max_handrank);
+
+	int c0, c1, c2, c3, c4, c5, c6, c7, c8;
+	int u0, u1, u2, u3, u4, u5, u6, u7;
+
+	for (c0 = 1; c0 < 53; c0++) {
+		u0 = _HR[53+c0];
+		for (c1 = c0+1; c1 < 53; c1++) {
+			u1 = _HR[u0+c1];
+			for (c2 = c1+1; c2 < 53; c2++) {
+				u2 = _HR[u1+c2];
+				for (c3 = c2+1; c3 < 53; c3++) {
+					u3 = _HR[u2+c3];
+					for (c4 = c3+1; c4 < 53; c4++) {
+						u4 = _HR[u3+c4];
+						for (c5 = c4+1; c5 < 53; c5++) {
+							u5 = _HR[u4+c5];
+							for (c6 = c5+1; c6 < 53; c6++) {
+								u6 = _HR[u5+c6];
+								for (c7 = c6+1; c7 < 53; c7++) {
+									u7 = _HR[u6+c7];
+									for (c8 = c7 + 1; c8 < 53; c8++){
+										handTypeSum[_HR[u7+c8] >> 12]++;
+										count++;
+									}
+								}
+								// handTypeSum[_HR[u5+c6] >> 12]++;
+								// count++;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	int i;
+	for (i = 0; i <= 9; i++)
+		printf("\n%16s: %d", HandRanks[i], handTypeSum[i]);
+	
+	printf("\nTotal hands = %llu\n", count);
+
+	int found = 0;
+	for (i = 0; i < HR9_SIZE; i++)
+		if (_HR[i] != 0)
+		{			
+			printf("non-zero found: %d: %d\n", i, _HR[i]);
+			found = 1;
+			break;
+		}
+	if (!found)
+		printf("no non-zero values found\n");
+
+	FILE * fout = fopen(filename, "wb");
+	int result = 1;
+	if (fout)
+	{
+		result = 0;
+		int written = fwrite(_HR, sizeof(int), HR9_SIZE, fout);
+		printf("Elements written: %d.\n", written);
+		fclose(fout);
+	}
+	free(_HR); free(ids); _HR = 0; ids = 0;
+	return result;
+}
+
+int *load_handranks_9(const char *filename)
+{
+	int *_HR_9 = (int *) malloc(HR9_SIZE * sizeof(int));
+	FILE *f = fopen(filename, "rb");
+	if (f)
+	{
+		fread(_HR_9, sizeof(int), HR9_SIZE, f);
+		fclose(f);
+		return _HR_9;
+	}
+	else
+		return NULL;
+}
+
+int main()
+{
+	generate_handranks_9("hr9.dat");
+
+	int *HR9 = (int *) malloc(HR9_SIZE * sizeof(int));
+	FILE *fin = fopen("hr9.dat", "rb");
+	if (fin)
+	{
+		fread(HR9, sizeof(int), HR9_SIZE, fin);
+		fclose(fin);
+	}
+	int i, found = 0;
+	for (i = 0; i < HR9_SIZE; i++)
+	{
+		if (HR9[i] != 0)
+		{			
+			printf("%d: %d\n", i, HR9[i]);
+			found = 1;
+			break;
+		}
+	}
+	if (!found)
+		printf("no non-zero values found\n");
+	free(HR9);
+	HR9 = 0;
+	return 0;
 }

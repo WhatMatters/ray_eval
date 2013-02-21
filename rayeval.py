@@ -25,6 +25,10 @@ def load_handranks(filename):
     _rayeval.load_handranks(filename)
 
 
+def load_handranks_9(filename):
+    _rayeval.load_handranks_9(filename)
+
+
 def seed(n):
     """
     Set the random seed for sampling to a specified values.
@@ -41,7 +45,7 @@ def eval_mc(game='holdem', board='', pocket=['', ''],
     is_iterable = lambda x: isinstance(x, list) or isinstance(x, tuple)
     split_string = lambda x: [] if not x.strip() else [
         c.strip() for c in x.split(' ')]
-    if game not in ('holdem', 'omaha'):
+    if game not in ('holdem', 'omaha', 'omaha_9'):
         raise ValueError('Invalid game type.')
     if isinstance(board, basestring):
         board = split_string(board)
