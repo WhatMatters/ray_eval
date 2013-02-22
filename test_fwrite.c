@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define HR9_SIZE 	620518328 // 134217728
+#define HR9_SIZE 	    620518328 // 134217728
+#define READ_BLOCK_SIZE 500000000
 
 
 int main()
@@ -16,12 +17,8 @@ int main()
 	int i, count1 = 0;
 	for (i = 0; i < HR9_SIZE; i++)
 		if (!(i % 12345))
-		{
 			HR9[i] = i;
-			count1++;
-		}
-	printf(" -> count1 = %d", count1);
-
+    
 	printf(" -> writing...");
 	FILE *f = fopen("test_fwrite.dat", "wb");
 	fwrite(HR9, sizeof(int), HR9_SIZE, f);
@@ -31,16 +28,25 @@ int main()
 	HR9 = 0;
 
 	printf(" -> reading...");
-	HR9 = (int *) malloc(HR9_SIZE * sizeof(int));
+    
 	f = fopen("test_fwrite.dat", "rb");
-	fread(HR9, sizeof(int), HR9_SIZE, f);
+    int ret = 0;
+	
+    HR9 = (int *) malloc(HR9_SIZE * sizeof(int));
+    ret = fread(HR9, sizeof(int), READ_BLOCK_SIZE, f);
+    ret += fread(HR9 + READ_BLOCK_SIZE, sizeof(int), HR9_SIZE - READ_BLOCK_SIZE, f);
 	fclose(f);
+    
+    printf("\nret: %d\n", ret);
 
-	int count2 = 0;
+	int errors = 0;
 	for (i = 0; i < HR9_SIZE; i++)
-		if (HR9[i])
-			count2++;
-	printf(" -> count2 = %d -> %s\n", count2, count2 == count1 ? "success" : "fail");
+        if (!(i % 12345))
+            if (HR9[i] != i)
+                errors++;
+        
+
+    printf(" -> errors = %d -> %s\n", errors, errors > 0 ? "fail" : "success");
 
 	free(HR9);
 	HR9 = 0;
