@@ -480,7 +480,7 @@ int *load_handranks(const char *filename)
 	FILE *f = fopen(filename, "rb");
 	if (f)
 	{
-		fread(_HR, sizeof(_HR), 1, f);
+		load_file(_HR, sizeof(_HR), 1, f);
 		fclose(f);
 		return _HR;
 	}
@@ -992,6 +992,27 @@ int do_eval_9(int64_t id_in)
 #define HR9_SIZE 	620518328
 #define ID9_SIZE 	11707876
 
+#define READ_BLOCK_SIZE 2000000000
+
+int load_file(void* dest, size_t size, size_t nitems, FILE* stream)
+{
+    int ret = 0;
+    int read_block_nitems = READ_BLOCK_SIZE / size;
+    int nitems_block;
+    int offset = 0;
+    int nitems_left = nitems;
+    
+    while (nitems_left > 0)
+    {
+        nitems_block = nitems_left > read_block_nitems ? read_block_nitems : nitems_left;
+        ret += fread(dest+offset, size, nitems_block, stream);
+        offset += nitems_block * size;
+        nitems_left -= nitems_block;
+    }
+    
+    return ret;
+}
+
 int generate_handranks_9(const char *filename)
 {
 
@@ -1125,7 +1146,7 @@ int *load_handranks_9(const char *filename)
 	FILE *f = fopen(filename, "rb");
 	if (f)
 	{
-		fread(_HR_9, sizeof(int), HR9_SIZE, f);
+		load_file(_HR_9, sizeof(int), HR9_SIZE, f);
 		fclose(f);
 		return _HR_9;
 	}
@@ -1141,7 +1162,7 @@ int main()
 	FILE *fin = fopen("hr9.dat", "rb");
 	if (fin)
 	{
-		fread(HR9, sizeof(int), HR9_SIZE, fin);
+		load_file(HR9, sizeof(int), HR9_SIZE, fin);
 		fclose(fin);
 	}
 	int i, found = 0;
