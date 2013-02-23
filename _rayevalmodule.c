@@ -4,6 +4,7 @@
 #include <string.h>
 #include <Python.h>
 #include "arrays.h"
+#include "load_file.h"
 
 #define MAX_PLAYERS 		10
 
@@ -476,7 +477,7 @@ int *load_handranks(const char *filename)
 	FILE *f = fopen(filename, "rb");
 	if (f)
 	{
-		fread(_HR, sizeof(_HR), 1, f);
+		load_file(_HR, sizeof(_HR), 1, f);
 		fclose(f);
 		return _HR;
 	}
@@ -492,7 +493,7 @@ int *load_handranks_9(const char *filename)
 	FILE *f = fopen(filename, "rb");
 	if (f)
 	{
-		fread(_HR9, sizeof(_HR9), 1, f);
+		load_file(_HR9, sizeof(_HR9), 1, f);
 		fclose(f);
 		int i;
 		for (i = 1000; i < 1100; i++)

@@ -21,13 +21,13 @@ if __name__ == '__main__':
     print 'Elapsed: %.2f seconds (%.2fM iterations / sec).' % (
         elapsed, iterations / elapsed / 1e6)
 
-    # t0 = time.time()
-    # ev = rayeval.eval_mc('omaha_9', board, pocket, iterations, n_jobs)
-    # elapsed = time.time() - t0
-    # print '[%s]' % game, pocket[:1], 'vs', pocket[1:], (
-    #     ': EV = %.4f%% (%.2gM iterations).' % (100. * ev[0], iterations / 1e6))
-    # print 'Elapsed: %.2f seconds (%.2fM iterations / sec).' % (
-    #     elapsed, iterations / elapsed / 1e6)
+    t0 = time.time()
+    ev = rayeval.eval_mc('omaha_9', board, pocket, iterations, n_jobs)
+    elapsed = time.time() - t0
+    print '[%s]' % game, pocket[:1], 'vs', pocket[1:], (
+        ': EV = %.4f%% (%.2gM iterations).' % (100. * ev[0], iterations / 1e6))
+    print 'Elapsed: %.2f seconds (%.2fM iterations / sec).' % (
+        elapsed, iterations / elapsed / 1e6)
 
     import pokereval
     t0 = time.time()

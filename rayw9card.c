@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include "arrays.h"
+#include "load_file.h"
 
 #define MAX_PLAYERS 		10
 
@@ -991,27 +992,6 @@ int do_eval_9(int64_t id_in)
 
 #define HR9_SIZE 	620518328
 #define ID9_SIZE 	11707876
-
-#define READ_BLOCK_SIZE 2000000000
-
-int load_file(void* dest, size_t size, size_t nitems, FILE* stream)
-{
-    int ret = 0;
-    int read_block_nitems = READ_BLOCK_SIZE / size;
-    int nitems_block;
-    int offset = 0;
-    int nitems_left = nitems;
-    
-    while (nitems_left > 0)
-    {
-        nitems_block = nitems_left > read_block_nitems ? read_block_nitems : nitems_left;
-        ret += fread(dest+offset, size, nitems_block, stream);
-        offset += nitems_block * size;
-        nitems_left -= nitems_block;
-    }
-    
-    return ret;
-}
 
 int generate_handranks_9(const char *filename)
 {
