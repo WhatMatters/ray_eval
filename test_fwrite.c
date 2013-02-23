@@ -8,22 +8,20 @@
 int load_file(void* dest, size_t size, size_t nitems, FILE* stream)
 {
     int ret = 0;
-    int read_block_nitems = READ_BLOCK_SIZE / size;
-    int nitems_block;
+    size_t bytes_to_load = nitems * size;
+    int block_size = 0;
     int offset = 0;
-    int nitems_left = nitems;
         
-    while (nitems_left > 0)
-    {        
-        nitems_block = nitems_left > read_block_nitems ? read_block_nitems : nitems_left;
-        ret += fread(dest+offset, size, nitems_block, stream);
-        offset += nitems_block * size;
-        nitems_left -= nitems_block;
+    while (bytes_to_load > 0)
+    {
+        block_size = bytes_to_load > READ_BLOCK_SIZE ? READ_BLOCK_SIZE : bytes_to_load;
+        ret += fread(dest+offset, block_size, 1, stream);
+        offset += block_size;
+        bytes_to_load -= block_size;
     }
     
     return ret;
 }
-
 
 
 int main()
@@ -32,6 +30,7 @@ int main()
 
 	int *HR9 = (int *) malloc(HR9_SIZE * sizeof(int));
 	memset((int *) HR9, 0, HR9_SIZE * sizeof(int));
+    
 
 	printf("generating...");
 	int i, count1 = 0;
