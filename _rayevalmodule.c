@@ -42,6 +42,8 @@ const char HandRanks[][16] = {"BAD!!","High Card","Pair","Two Pair","Three of a 
 #define min(a, b)  			(((a) < (b)) ? (a) : (b))
 #define max(a, b)  			(((a) > (b)) ? (a) : (b))
 
+#define HR9_SIZE            620518328
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //							HAND RANKS .DAT FILE GENERATOR
@@ -473,7 +475,7 @@ static int *HR = 0;
 
 int *load_handranks(const char *filename)
 {
-	static int _HR[32487834]; 	
+	static int _HR[32487834];
 	FILE *f = fopen(filename, "rb");
 	if (f)
 	{
@@ -489,11 +491,11 @@ static int *HR9 = 0;
 
 int *load_handranks_9(const char *filename)
 {
-	static int _HR9[620518328]; 	
+    int *_HR9 = (int *) malloc(HR9_SIZE * sizeof(int));
 	FILE *f = fopen(filename, "rb");
 	if (f)
 	{
-		load_file(_HR9, sizeof(_HR9), 1, f);
+		load_file(_HR9, sizeof(int), HR9_SIZE, f);
 		fclose(f);
 		int i;
 		for (i = 1000; i < 1100; i++)
