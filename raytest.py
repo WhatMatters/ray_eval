@@ -4,8 +4,8 @@ import rayeval
 import time
 
 if __name__ == '__main__':
-    rayeval.load_handranks('HandRanks.dat')
-    # rayeval.load_handranks_9('hr9.dat')
+#    rayeval.load_handranks('HandRanks.dat')
+    rayeval.load_handranks_9('hr9.dat')
 
     game = 'omaha'
     board = '2h 2d 2s * *'
