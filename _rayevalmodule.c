@@ -487,7 +487,7 @@ int *load_handranks(const char *filename)
 		return NULL;
 }
 
-static int *HR9 = 0;
+int *HR9 = 0;
 
 int *load_handranks_9(const char *filename)
 {
