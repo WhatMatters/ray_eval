@@ -736,7 +736,8 @@ int64_t make_id_9(int64_t id_in, int new_card)
 		cards[n + 1] = (int) ((id_in >> (7 * n)) & 0x7f);  // leave the 0 index for new card
 
 	new_card--;  // 1-52 -> 0-51
-	cards[0] = (((new_card >> 2) + 1) << 3) + (new_card & 3) + 1;  // add next card formats card to rrrr00ss
+	cards[0] = (((new_card >> 2) + 1) << 3) + (new_card & 3) + 1;  
+	// add next card formats card to rrrr0ss
 
 	for (n_cards = 0; cards[n_cards]; n_cards++) 
 	{
@@ -749,6 +750,10 @@ int64_t make_id_9(int64_t id_in, int new_card)
 	if (done)
 		return 0; // duplicate of another card (ignore this one)    
 	
+	// ACHTUNG
+	// THIS SHOULD PROBABLY BE FIXED FOR 9 CARDS? needsuited = ?
+	// ACHTUNG
+
 	needsuited = n_cards - 2; // for suit to be significant - need to have n-2 of same suit
 
 	int rank;	     
@@ -768,26 +773,30 @@ int64_t make_id_9(int64_t id_in, int new_card)
 			if (n_suit[cards[n] & 0x7] < needsuited) // check n_suit to the number I need to have suits significant
 				cards[n] &= 0x78; // if not enough - 0 out the suit - now this suit would be a 0 vs 1-4
 
-	// sort using XOR (network for N = 7, using Bose-Nelson algorithm)
-	#define SWAP(I, J) {if (cards[I] < cards[J]) {cards[I] ^= cards[J]; cards[J] ^= cards[I]; cards[I] ^= cards[J];}}		
+	// sort using XOR (network for N=4 and N=5, using Bose-Nelson algorithm)
 
-	// SWAP(0, 4);	SWAP(1, 5);	SWAP(2, 6);	SWAP(0, 2);		
-	// SWAP(1, 3);	SWAP(4, 6);	SWAP(2, 4);	SWAP(3, 5);		
-	// SWAP(0, 1);	SWAP(2, 3);	SWAP(4, 5);	SWAP(1, 4);		
-	// SWAP(3, 6);	SWAP(1, 2);	SWAP(3, 4);	SWAP(5, 6);	
+	// THATS A REVERSED BOSE NELSON NETWORK YOU BITCHES // Aldanor
+	#define SWAP(I, J) {if (cards[I] < cards[J]) {cards[I] ^= cards[J]; cards[J] ^= cards[I]; cards[I] ^= cards[J];}}		
 
 	// Bose-Nelson, N=4
 	SWAP(0, 1); SWAP(2, 3);
 	SWAP(0, 2); SWAP(1, 3);
 	SWAP(1, 2);
 
+	// CHEAT!
+	SWAP(0, 3); SWAP(1, 2);
+
 	// Bose-Nelson, N=5
 	SWAP(4, 5); SWAP(7, 8);
 	SWAP(6, 8);
 	SWAP(6, 7); SWAP(5, 8);
 	SWAP(4, 7);
-	SWAP(4, 6); SWAP(5, 8);
+	SWAP(4, 6); SWAP(5, 7);
 	SWAP(5, 6);
+
+	// CHEAT!
+	SWAP(4, 8);
+	SWAP(5, 7);
 
 	// store cards in bytes --66554433221100	 
 	// the resulting ID is a 64 bit value with each card represented by 7 bits.
@@ -856,7 +865,7 @@ int eval_789(int *cards, int n)
 	if (n_board_perms == -1)
 		return -1;
 
-	int np, nb, best = 8191;
+	int np, nb, best = 8191, q = 0;
 	for (np = 0; np < n_pocket_perms; np++)
 	{
 		for (nb = 0; nb < n_board_perms; nb++)
@@ -867,7 +876,14 @@ int eval_789(int *cards, int n)
 			subhand[2] = cards[4 + board_perms[nb][0]];
 			subhand[3] = cards[4 + board_perms[nb][1]];
 			subhand[4] = cards[4 + board_perms[nb][2]];
-			int q = eval_5hand(subhand);
+
+			// subhand[0] = cards[n - 1 - pocket_perms[0][np]];
+			// subhand[1] = cards[n - 1 - pocket_perms[1][np]];
+			// subhand[2] = cards[n - 1 - 4 - board_perms[nb][0]];
+			// subhand[3] = cards[n - 1 - 4 - board_perms[nb][1]];
+			// subhand[4] = cards[n - 1 - 4 - board_perms[nb][2]];
+
+			q = eval_5hand(subhand);
 			if (q < best)
 				best = q;
 		}
@@ -896,7 +912,7 @@ int do_eval_9(int64_t id_in)
 
 	if (id_in) // if then id is good then do it
 	{
-		for (n = 0; n < 9; n++) // convert all 7 cards (0s are ok)
+		for (n = 0; n < 9; n++) // convert all 9 cards (0s are ok)
 		{  
 			holdcards[n] =  (int) ((id_in >> (7 * n)) & 0x7f); 
 			if (holdcards[n] == 0) 
@@ -945,31 +961,9 @@ int do_eval_9(int64_t id_in)
 		if (numevalcards < 7 || numevalcards > 9)
 			return -1;
 
-		holdrank = eval_789(wcards, numevalcards);
+		holdrank = eval_789(wcards, numevalcards); // run Cactus Keys routines
 		if (holdrank == -1)
 			return -1;
-
-		// switch (numevalcards) // run Cactus Keys routines
-		// {  
-		// 	case 5:  
-		// 		holdrank = eval_5cards(wcards[0],wcards[1],wcards[2],wcards[3],wcards[4]);
-		// 		break;
-		// 	// if 6 cards I would like to find HandRank for them 
-		// 	// Cactus Key is 1 = highest - 7362 lowest I need to get the min for the permutations
-		// 	case 6:  
-		// 		holdrank = eval_5cards(wcards[0], wcards[1], wcards[2], wcards[3], wcards[4]);
-		// 		holdrank = min(holdrank, eval_5cards(wcards[0], wcards[1], wcards[2], wcards[3], wcards[5]));
-		// 		holdrank = min(holdrank, eval_5cards(wcards[0], wcards[1], wcards[2], wcards[4], wcards[5]));
-		// 		holdrank = min(holdrank, eval_5cards(wcards[0], wcards[1], wcards[3], wcards[4], wcards[5]));
-		// 		holdrank = min(holdrank, eval_5cards(wcards[0], wcards[2], wcards[3], wcards[4], wcards[5]));
-		// 		holdrank = min(holdrank, eval_5cards(wcards[1], wcards[2], wcards[3], wcards[4], wcards[5]));
-		// 		break;
-		// 	case 7: 
-		// 		holdrank = eval_7hand(wcards);  
-		// 		break;
-		// 	default : // problem!!  shouldn't hit this... 
-		// 		return -1;
-		// }
 
 		// change the format of Catus Kev's ret value to:
 		// hhhhrrrrrrrrrrrr   hhhh = 1 high card -> 9 straight flush
@@ -1023,12 +1017,13 @@ int generate_handranks_9(const char *filename)
 	// this is as above, but will not be adding anything to the ID list, so it is stable
 	for (n = 0; ids[n] || n == 0; n++) // start at 1 so I have a zero catching entry (just in case)
 	{  
-		for (card = 1; card < 53; card++) {
+		for (card = 1; card < 53; card++) 
+		{
 			ID = make_id_9(ids[n], card);
 			if (n_cards < 9)
 				id_slot = save_id_9(ID, ids, &max_id, &num_ids) * 53 + 53;  // when in the index mode (< 9 cards) get the id to save
 			else
-				id_slot = do_eval_9(ID);   // if I am at the 7th card, get the HandRank to save
+				id_slot = do_eval_9(ID);   // if I am at the 9th card, get the HandRank to save
 			if (id_slot == -1)
 			{
 				printf("    Error: problem with n_cards = %d.\n", n_cards);

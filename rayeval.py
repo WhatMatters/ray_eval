@@ -21,6 +21,14 @@ def rank_to_card(rank):
     return __card_list[rank]
 
 
+def is_iterable(x):
+    return isinstance(x, list) or isinstance(x, tuple)
+
+
+def split_string(x):
+    return [] if not x.strip() else [c.strip() for c in x.split(' ')]
+
+
 def load_handranks(filename):
     _rayeval.load_handranks(filename)
 
@@ -36,52 +44,124 @@ def seed(n):
     _rayeval.seed(n)
 
 
-def eval_mc(game='holdem', board='', pocket=['', ''],
-            iterations=1e6, n_jobs=1):
-    """
-    Some docstring goes here.
-    """
-
-    is_iterable = lambda x: isinstance(x, list) or isinstance(x, tuple)
-    split_string = lambda x: [] if not x.strip() else [
-        c.strip() for c in x.split(' ')]
-    if game not in ('holdem', 'omaha', 'omaha_9'):
-        raise ValueError('Invalid game type.')
+def parse_board(board):
     if isinstance(board, basestring):
         board = split_string(board)
     if not is_iterable(board):
         raise TypeError('Board must be a list, a tuple or a string.')
-    if isinstance(pocket, basestring):
-        pocket = split_string(pocket)
-    if not is_iterable(pocket):
-        raise TypeError('Pocket must be a list or a tuple.')
-    iterations = int(iterations)
     n_board = len(board)
     if n_board is 0:
         board = ['*'] * 5
     elif n_board < 3 or n_board > 5:
         raise ValueError('Invalid board size.')
-    n_players = len(pocket)
+    return [card_to_rank(c) for c in board]
+
+
+def parse_pocket(pocket, game):
+    pocket_size = 2 if game == 'holdem' else 4
+    if isinstance(pocket, basestring):
+        pocket = split_string(pocket)
+    if not is_iterable(pocket):
+        raise TypeError('Pocket must be a list, a tuple or a string.')
+    if len(pocket) > pocket_size:
+        raise ValueError('Invalid pocket size for selected game type.')
+    return [card_to_rank(c) for c in pocket] + [255] * (pocket_size - len(pocket))
+
+
+def parse_pockets(pockets, game):
+    if isinstance(pockets, basestring):
+        pockets = split_string(pockets)
+    if not is_iterable(pockets):
+        raise TypeError('Pockets must be a list or a tuple.')
+    n_players = len(pockets)
     if n_players <= 1 or n_players > 10:
         raise ValueError('Invalid number of players.')
-    i_board = [card_to_rank(c) for c in board]
-    pocket_size = 2 if game == 'holdem' else 4
-    i_pocket = []
-    for p in pocket:
-        if isinstance(p, basestring):
-            p = split_string(p)
-        if not is_iterable(p):
-            raise TypeError('Each pocket must be a list, a tuple or a string.')
-        if len(p) > pocket_size:
-            raise ValueError('Invalid pocket size for selected game type.')
-        i_pocket.extend([card_to_rank(c) for c in p])
-        i_pocket.extend([255] * (pocket_size - len(p)))
+    i_pockets = []
+    map(i_pockets.extend, map(parse_pocket, pockets))
+    return i_pockets
+
+
+def parse_game(game):
+    if game not in ('holdem', 'omaha', 'omaha_9'):
+        raise ValueError('Invalid game type.')
+    return game
+
+
+def eval_hand(game='holdem', board='', pocket=''):
+    game = parse_game(game)
+    i_board = parse_board(board)
+    i_pocket = parse_pocket(pocket, game)
+    return _rayeval.eval_hand(game, i_board, i_pocket)
+
+
+def which_hand(cards, value):
+    import itertools
+    for h in itertools.combinations(cards, 5):
+        if eval_hand('holdem', h[:3], h[3:]) == value:
+            return h
+
+
+def eval_mc(game='holdem', board='', pockets=['', ''],
+            iterations=1e6, n_jobs=1):
+    game = parse_game(game)
+    i_board = parse_board(board)
+    i_pockets = parse_pockets(pockets, game)
+    iterations = int(iterations)
     if not isinstance(n_jobs, int) or n_jobs <= 0:
         raise ValueError('Invalid number of jobs.')
     if n_jobs is 1:
-        return _rayeval.eval_mc(game, i_board, i_pocket, iterations)
+        return _rayeval.eval_mc(game, i_board, i_pockets, iterations)
     else:
         result = joblib.Parallel(n_jobs=n_jobs)(joblib.delayed(
-            _rayeval.eval_mc)(game, i_board, i_pocket, iterations / n_jobs)
+            _rayeval.eval_mc)(game, i_board, i_pockets, iterations / n_jobs)
             for i in xrange(n_jobs))
         return [sum(c) / float(n_jobs) for c in zip(*result)]
+
+
+
+# def eval_mc(game='holdem', board='', pocket=['', ''],
+#             iterations=1e6, n_jobs=1):
+#     """
+#     Some docstring goes here.
+#     """
+
+#     if game not in ('holdem', 'omaha', 'omaha_9'):
+#         raise ValueError('Invalid game type.')
+#     if isinstance(board, basestring):
+#         board = split_string(board)
+#     if not is_iterable(board):
+#         raise TypeError('Board must be a list, a tuple or a string.')
+#     if isinstance(pocket, basestring):
+#         pocket = split_string(pocket)
+#     if not is_iterable(pocket):
+#         raise TypeError('Pocket must be a list or a tuple.')
+#     iterations = int(iterations)
+#     n_board = len(board)
+#     if n_board is 0:
+#         board = ['*'] * 5
+#     elif n_board < 3 or n_board > 5:
+#         raise ValueError('Invalid board size.')
+#     n_players = len(pocket)
+#     if n_players <= 1 or n_players > 10:
+#         raise ValueError('Invalid number of players.')
+#     i_board = [card_to_rank(c) for c in board]
+#     pocket_size = 2 if game == 'holdem' else 4
+#     i_pocket = []
+#     for p in pocket:
+#         if isinstance(p, basestring):
+#             p = split_string(p)
+#         if not is_iterable(p):
+#             raise TypeError('Each pocket must be a list, a tuple or a string.')
+#         if len(p) > pocket_size:
+#             raise ValueError('Invalid pocket size for selected game type.')
+#         i_pocket.extend([card_to_rank(c) for c in p])
+#         i_pocket.extend([255] * (pocket_size - len(p)))
+#     if not isinstance(n_jobs, int) or n_jobs <= 0:
+#         raise ValueError('Invalid number of jobs.')
+#     if n_jobs is 1:
+#         return _rayeval.eval_mc(game, i_board, i_pocket, iterations)
+#     else:
+#         result = joblib.Parallel(n_jobs=n_jobs)(joblib.delayed(
+#             _rayeval.eval_mc)(game, i_board, i_pocket, iterations / n_jobs)
+#             for i in xrange(n_jobs))
+#         return [sum(c) / float(n_jobs) for c in zip(*result)]
