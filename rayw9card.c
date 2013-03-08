@@ -725,91 +725,127 @@ int eval_monte_carlo_omaha(int N, int *board, int n_board,
 // add a new card to this id
 int64_t make_id_9(int64_t id_in, int new_card) 
 {
-	int n_suit[4 + 1], n_rank[13 + 1], n, done = 0, needsuited;
+	int n_rank[13 + 1], n, i, j, done = 0, needsuited;
 	int cards[10];  // intentially keep an extra one as 0 end
+    int pocket[5], n_suit_pocket[4 + 1];
+    int board[6], n_suit_board[4 + 1];
 	
 	memset(cards, 0, sizeof(cards));
+    memset(pocket, 0, sizeof(pocket));
+    memset(board, 0, sizeof(board));
 	memset(n_rank, 0, sizeof(n_rank));
-	memset(n_suit, 0, sizeof(n_suit));
-	
+	memset(n_suit_pocket, 0, sizeof(n_suit_pocket));
+    memset(n_suit_board, 0, sizeof(n_suit_board));
+	   
 	for (n = 0; n < 8; n++) // can't have more than 8 cards
 		cards[n + 1] = (int) ((id_in >> (7 * n)) & 0x7f);  // leave the 0 index for new card
 
 	new_card--;  // 1-52 -> 0-51
-	cards[0] = (((new_card >> 2) + 1) << 3) + (new_card & 3) + 1;  
+	cards[0] = (((new_card >> 2) + 1) << 3) + (new_card & 3) + 1;
 	// add next card formats card to rrrr0ss
-
-	for (n_cards = 0; cards[n_cards]; n_cards++) 
+    
+	for (n_cards = 0; cards[n_cards]; n_cards++)
 	{
-		n_suit[cards[n_cards] & 0x7]++; // need to see if suit is significant
 		n_rank[(cards[n_cards] >> 3) & 0xf]++; // and rank to be sure we don't have 4
 		if (n_cards && (cards[0] == cards[n_cards])) // can't have the same card twice
 			done = 1; // if so - need to quit after counting n_cards
 	}
-
+    
 	if (done)
 		return 0; // duplicate of another card (ignore this one)    
 	
-	// ACHTUNG
-	// THIS SHOULD PROBABLY BE FIXED FOR 9 CARDS? needsuited = ?
-	// ACHTUNG
-
-	needsuited = n_cards - 2; // for suit to be significant - need to have n-2 of same suit
-
 	int rank;	     
 	if (n_cards > 4)  
 		for (rank = 1; rank < 14; rank++)
 			if (n_rank[rank] > 4) // >= 4 of a rank => shouldn't do this one
 				return 0; // can't have > 4 of a rank so return an invalid id
-	
+    
+    for (i = 0; i < n_cards - 5; i++)
+    {
+        n_suit_pocket[cards[i] & 0x7]++; // need to see if suit is significant
+        pocket[i] = cards[i];
+    }
+    for (j = i; j < n_cards; j++)
+    {
+        n_suit_board[cards[j] & 0x7]++; // need to see if suit is significant
+        board[j - i] = cards[j];
+    }
+    
 	// In the ID process, if we have
 	// 2s = 0x21, 3s = 0x31,.... Kc = 0xD4, Ac = 0xE4
 	// then it allows us to sort in rank then suit order
 	
 	// if we don't have at least 2 cards of the same suit for 4, we make this card suit 0.
+    if (n_cards > 3 && n_cards < 9)
+    {
+        needsuited = n_cards == 3 ? 2 : 3;
+        for (n = 0; board[n]; n++)
+            if (n_suit_board[board[n] & 0x7] < needsuited) // check n_suit to the number I need to have suits significant
+                board[n] &= 0x78; // if not enough - 0 out the suit - now this suit would be a 0 vs 1-4
+
+        if (n_cards > 5)
+        {
+            int flush = 0;
+            for (n = 1; n < 5; n++)
+                if (n_suit_board[n] > 2)
+                    flush = 1;
+            if (!flush)
+                for (n = 0; pocket[n]; n++)
+                    pocket[n] &= 0x78;
+        }
+    }
+    else if (n_cards == 9)
+    {
+        int flush = 0;
+        for (n = 1; n < 5; n++)
+            if (n_suit_board[n] > 2 && n_suit_pocket[n] > 1)
+                flush = 1;
+        if (!flush)
+        {
+            for (n = 0; pocket[n]; n++)
+                pocket[n] &= 0x78;
+            for (n = 0; board[n]; n++)
+                board[n] &= 0x78;
+        }
+        
+    }
 	
-	if (needsuited > 1)
-		for (n = 0; n < n_cards; n++) // for each card
-			if (n_suit[cards[n] & 0x7] < needsuited) // check n_suit to the number I need to have suits significant
-				cards[n] &= 0x78; // if not enough - 0 out the suit - now this suit would be a 0 vs 1-4
-
 	// sort using XOR (network for N=4 and N=5, using Bose-Nelson algorithm)
-
+    
 	// THATS A REVERSED BOSE NELSON NETWORK YOU BITCHES // Aldanor
-	#define SWAP(I, J) {if (cards[I] < cards[J]) {cards[I] ^= cards[J]; cards[J] ^= cards[I]; cards[I] ^= cards[J];}}		
+    #define SWAP_C(I, J, C) {if (C[I] < C[J]) {C[I] ^= C[J]; C[J] ^= C[I]; C[I] ^= C[J];}}
 
 	// Bose-Nelson, N=4
-	SWAP(0, 1); SWAP(2, 3);
-	SWAP(0, 2); SWAP(1, 3);
-	SWAP(1, 2);
-
-	// CHEAT!
-	SWAP(0, 3); SWAP(1, 2);
+	SWAP_C(0, 1, pocket); SWAP_C(2, 3, pocket);
+	SWAP_C(0, 2, pocket); SWAP_C(1, 3, pocket);
+	SWAP_C(1, 2, pocket);
 
 	// Bose-Nelson, N=5
-	SWAP(4, 5); SWAP(7, 8);
-	SWAP(6, 8);
-	SWAP(6, 7); SWAP(5, 8);
-	SWAP(4, 7);
-	SWAP(4, 6); SWAP(5, 7);
-	SWAP(5, 6);
+	SWAP_C(0, 1, board); SWAP_C(3, 4, board);
+	SWAP_C(2, 4, board);
+	SWAP_C(2, 3, board); SWAP_C(1, 4, board);
+	SWAP_C(0, 3, board);
+	SWAP_C(0, 2, board); SWAP_C(1, 3, board);
+	SWAP_C(1, 2, board);
 
-	// CHEAT!
-	SWAP(4, 8);
-	SWAP(5, 7);
+    memset(cards, 0, sizeof(cards));
+    for (i = 0; pocket[i]; i++)
+        cards[i] = pocket[i];
+    for (j = 0; board[j]; j++)
+        cards[i + j] = board[j];
 
 	// store cards in bytes --66554433221100	 
 	// the resulting ID is a 64 bit value with each card represented by 7 bits.
 	// Aldanor: 7 bits! 7 bits! 7 fucking bits
 	return ((int64_t) cards[0] +
 		 ((int64_t) cards[1] << 7) +
-		 ((int64_t) cards[2] << 14) + 
+		 ((int64_t) cards[2] << 14) +
 		 ((int64_t) cards[3] << 21) +
 		 ((int64_t) cards[4] << 28) +
 		 ((int64_t) cards[5] << 35) +
 		 ((int64_t) cards[6] << 42) +
 		 ((int64_t) cards[7] << 49) +
-		 ((int64_t) cards[8] << 56));    
+		 ((int64_t) cards[8] << 56));
 }
 
 int save_id_9(int64_t id, int64_t *ids, int64_t *max_id, int *num_ids) 
