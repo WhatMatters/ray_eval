@@ -46,19 +46,6 @@ int count_cards(int64_t id)
 		(((id >> 56) & 0x7F) != 0);
 }
 
-template <class T>
-bool is_sorted(std::vector<T> vec)
-{
-	return (std::adjacent_find(vec.begin(), vec.end(), std::greater<T>()) == vec.end());	
-}
-
-// this shit is slow, use hash tables (tr1::unordered_map) instead
-int find_first(std::vector<int64_t> vec, int64_t value)
-{
-	// return equal_range(vec.begin(), vec.end(), value).first - vec.begin();
-	return (std::lower_bound(vec.begin(), vec.end(), value) - vec.begin());
-}
-
 void add_card(int new_card, int *pocket, int *board, int &n_pocket, int &n_board)
 {
 	if (n_pocket < 4)
@@ -123,12 +110,8 @@ int eval_flush_suits(int64_t id)
 	for (int i = 0; i < n_board; i++)
 		n_suit_board[board[i]] = MIN(n_suit_board[board[i]] + 1, 3);
 	for (int suit = 1; suit <= 4; suit++)
-	{
-		// std::cout << "\n" << suit << ": nsp = " << n_suit_pocket[suit] <<
-		// 	", nsb = " << n_suit_board[suit];
 		if ((n_suit_pocket[suit] + n_suit_board[suit]) >= 5)
 			return suit;
-	}
 	return -1;
 }
 
@@ -159,34 +142,12 @@ int64_t add_card_to_id_flush_ranks(int64_t id, int new_card, int flush_suit)
 		if (board[i] != ANY_CARD && board[i] != 0)
 			nsb++;
 
-	// std::sort(pocket, pocket + 4);
-	// std::sort(board, board + 5);
-	// std::reverse(pocket, pocket + 4);
-	// std::reverse(board, board + 5);
-
-	bool debug = false;
-
-	// if (n_pocket == 4 && n_board == 2 && pocket[0] == 4 && pocket[1] == 3 &&
-	// 	pocket[2] == ANY_CARD && pocket[3] == ANY_CARD && board[0] == ANY_CARD &&
-	// 	board[1] == ANY_CARD)
-	// {
-	// 	debug = true;
-	// }
-
-	if (debug) std::cout << "\n4321+11: nsp = " << nsp << ", nsb = " << nsb;
-	if (debug) std::cout << "\nn_pocket = " << n_pocket << ", n_board = " << n_board;
-
-	// if (pack64(pocket, board) == 4432676815236LL)
-		// std::cout << "\n4321+111: nsp = " << nsp << ", nsb = " << nsb << "\n";
-
 	if (n_pocket >= 4 && nsp < 2)
 		return 0;
 
 	if (n_pocket >= 4 && n_board >= 2)
 		if ((5 - MAX(nsp, 2) - MAX(nsb, 3)) > (9 - n_pocket - n_board))
 			return 0;
-
-	if (debug) std::cout << "\n\tnon-zero...\n";
 
 	return pack64(pocket, board);
 }
@@ -253,10 +214,6 @@ int eval_flush_ranks(int64_t id)
 		}
 	}
 	return cactus_to_ray(best);
-
-	// int q = (1 << (pocket[0] - 2)) | (1 << (pocket[1] - 2)) |
-	// 	(1 << (board[0] - 2)) | (1 << (board[1] - 2)) | (1 << (board[2] - 2));
-	// return cactus_to_ray(flushes[q]);
 }
 
 int64_t add_card_to_id_no_flush(int64_t id, int new_card)
@@ -283,7 +240,6 @@ int card_to_cactus(int rank, int suit)
 	static bool buffered = false;
 	static int cards[14][5];
 	const int primes[13] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41};
-
 	if (!buffered)
 	{
 		for (int r = 0; r < 14; r++)
@@ -296,11 +252,7 @@ int card_to_cactus(int rank, int suit)
 					(1 << (s + 11)) | (1 << (16 + (r - 1)));
 		buffered = true;
 	}
-
 	return cards[rank][suit];
-
-	// rank--;
-	// return primes[rank] | (rank << 8) | (1 << (suit + 11)) | (1 << (16 + rank));
 }
 
 int cactus_findit(int key)
@@ -308,7 +260,7 @@ int cactus_findit(int key)
     int low = 0, high = 4887, mid;
     while (low <= high)
     {
-        mid = (high + low) >> 1; // divide by two
+        mid = (high + low) >> 1;
         if (key < products[mid])
             high = mid - 1;
         else if (key > products[mid])
@@ -320,7 +272,7 @@ int cactus_findit(int key)
     return -1;
 }
 
-int eval_cactus(int c1, int c2, int c3, int c4, int c5)
+int eval_cactus_no_flush(int c1, int c2, int c3, int c4, int c5)
 {
 	int s = unique5[(c1 | c2 | c3 | c4 | c5) >> 16];
 	if (s)
@@ -363,7 +315,7 @@ int eval_no_flush(int64_t id)
 	{
 		for (nb = 0; nb < n_board_perms; nb++)
 		{
-			q = eval_cactus(pocket[pocket_perms[0][np]],
+			q = eval_cactus_no_flush(pocket[pocket_perms[0][np]],
 				pocket[pocket_perms[1][np]],
 				board[board_perms[nb][0]],
 				board[board_perms[nb][1]],
@@ -424,9 +376,10 @@ void process_ids(std::vector<int64_t> ids, int offset, int offset_value,
 	std::vector<int> &hand_ranks, int64_t (*add_card_to_id)(int64_t, int),
 	int (*eval_id)(int64_t))
 {
-	// 0-52: loop with exit to 0
-	// 53-105: normal start
-	// 106+: normal
+	// offset + 0: special value
+	// offset + 1-52: loop back to offset + 0
+	// offset + 53: starting point
+	// offset + 54+: normal operation
 
 	int n = ids.size(), i, id_index, num_cards, new_card;
 	int64_t id, new_id;
@@ -444,59 +397,29 @@ void process_ids(std::vector<int64_t> ids, int offset, int offset_value,
 		hand_ranks[offset + i] = offset;
 	for (i = 0; i < n; i++)
 	{
-		// bool debug = (offset + 53 + i * 53) == 93545; // for flush suits
-		// bool debug = (i == 228233); // for flush ranks 1
-		bool debug = false;
-
 		id = ids[i];
 		std::cout << "\r\tProcessing ID " << i + 1 << " out of " << n << " (" << id << ")..." ;
 		id_index = offset + 53 + i * 53;
 		num_cards = count_cards(id);
 		hand_ranks[id_index] = offset; // safety backup
 
-		if (debug)
-		{
-			std::cout << "\ni = " << i << ", id = " << id << 
-				", num_cards = " << num_cards << "\n"; 
-		}
-
 		if (num_cards == 7 || num_cards == 8)
 		{
-			if (debug)
-			{
-				std::cout << "evaluating id: ";
-				std::cout << (*eval_id)(id) << "\n";
-			}
 			int value = (*eval_id)(id);
+			// we have to check this for example when constructing flush_ranks
+			// and a partial hand may not be a flush at all
 			hand_ranks[id_index] = (value != -1) ? value : offset;
 		}
 
 		for (new_card = 1; new_card <= 52; new_card++)
 		{			
 			new_id = (*add_card_to_id)(id, new_card);
-			// if (debug)
-			// {
-			// 	std::cout << "adding card " << new_card << " to id " << id << "...\n";
-			// 	std::cout << "\tnew_id = " << new_id << "\n";
-			// 	std::cout << "\tnum_cards: " << count_cards(id) << " -> " << count_cards(new_id) << "\n";
-			// }
 			if (new_id && ((num_cards + 1) == 9))
-			{
 				hand_ranks[id_index + new_card] = (*eval_id)(new_id);
-				if (debug) std::cout << "\t1\n";
-			}
 			else if (new_id)
-			{
 				hand_ranks[id_index + new_card] = offset + 53 + hash_table[new_id] * 53;
-				// if (debug) std::cout << "\t2: offset = " << offset << ", " <<
-				// 	" num_cards = " << num_cards << ", hash_table[new_id] = " << 
-				// 	hash_table[new_id] << "\n";
-			}
 			else
-			{
 				hand_ranks[id_index + new_card] = offset; // TODO: QUESTIONABLE
-				// if (debug) std::cout << "\t3\n";
-			}
 		}
 	}
 
