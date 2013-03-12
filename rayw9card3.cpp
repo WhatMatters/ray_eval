@@ -4,17 +4,25 @@
 #include <vector>
 #include <iomanip>
 #include <locale>
-#include <exception>
 #include <tr1/unordered_map>
 
 #include "arrays.h"
 #include "load_file.h"
 
-#define MAX(x, y) 				((x) > (y) ? (x) : (y))
-#define MIN(x, y) 				((x) < (y) ? (x) : (y))
-#define ANY_CARD 				1
-#define SWAP_LESS(A, I, J) 		{if (A[I] < A[J]) {A[I] ^= A[J]; A[J] ^= A[I]; A[I] ^= A[J];}}
-#define SWAP_GREATER(A, I, J) 	{if (A[I] > A[J]) {A[I] ^= A[J]; A[J] ^= A[I]; A[I] ^= A[J];}}
+#define MAX(x, y) 	((x) > (y) ? (x) : (y))
+#define MIN(x, y) 	((x) < (y) ? (x) : (y))
+
+const int ANY_CARD = 1;	// dummy placeholder for flush ranks eval
+
+const int pocket_perms[6][2] = {
+	{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}
+};
+const int board_perms[10][3] = {
+	{0, 1, 2}, 															// 3-5 cards
+	{0, 1, 3}, {0, 2, 3}, {1, 2, 3}, 									// 4-5 cards
+	{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}	// 5 cards
+}; 	
+const int n_pocket_perms = 6;
 
 int cactus_to_ray(int holdrank)
 {
@@ -56,6 +64,8 @@ void add_card(int new_card, int *pocket, int *board, int &n_pocket, int &n_board
 
 void unpack64(int64_t id, int *pocket, int *board, int &n_pocket, int &n_board)
 {
+	memset(pocket, 0, 4 * sizeof(int));
+	memset(board, 0, 5 * sizeof(int));
 	n_pocket = 0;
 	n_board = 0;
 	int card;
@@ -91,8 +101,7 @@ int64_t pack64(int *pocket, int *board)
 
 int64_t add_card_to_id_flush_suits(int64_t id, int new_card)
 {
-	int pocket[4] = {0, 0, 0, 0}, board[5] = {0, 0, 0, 0, 0}, 
-		n_pocket = 0, n_board = 0;
+	int pocket[4], board[5], n_pocket, n_board;
 	new_card = ((new_card - 1) & 3) + 1;
 	unpack64(id, pocket, board, n_pocket, n_board);
 	add_card(new_card, pocket, board, n_pocket, n_board);
@@ -101,24 +110,22 @@ int64_t add_card_to_id_flush_suits(int64_t id, int new_card)
 
 int eval_flush_suits(int64_t id)
 {
-	int pocket[4] = {0, 0, 0, 0}, board[5] = {0, 0, 0, 0, 0}, 
-		n_pocket = 0, n_board = 0, n_suit_pocket[5] = {0, 0, 0, 0, 0},
-		n_suit_board[5] = {0, 0, 0, 0, 0};
+	int pocket[4], board[5], n_pocket, n_board,
+		nsp[5] = {0, 0, 0, 0, 0}, nsb[5] = {0, 0, 0, 0, 0};
 	unpack64(id, pocket, board, n_pocket, n_board);
 	for (int i = 0; i < n_pocket; i++)
-		n_suit_pocket[pocket[i]] = MIN(n_suit_pocket[pocket[i]] + 1, 2);
+		nsp[pocket[i]] = MIN(nsp[pocket[i]] + 1, 2);
 	for (int i = 0; i < n_board; i++)
-		n_suit_board[board[i]] = MIN(n_suit_board[board[i]] + 1, 3);
+		nsb[board[i]] = MIN(nsb[board[i]] + 1, 3);
 	for (int suit = 1; suit <= 4; suit++)
-		if ((n_suit_pocket[suit] + n_suit_board[suit]) >= 5)
+		if ((nsp[suit] + nsb[suit]) >= 5)
 			return suit;
 	return -1;
 }
 
 int64_t add_card_to_id_flush_ranks(int64_t id, int new_card, int flush_suit)
 {
-	int pocket[4] = {0, 0, 0, 0}, board[5] = {0, 0, 0, 0, 0}, 
-		n_pocket = 0, n_board = 0, nsp = 0, nsb = 0, i;
+	int pocket[4], board[5], n_pocket, n_board, nsp = 0, nsb = 0, i;
 
 	// the rank is 2-14 if suited or 1 otherwise (for sorting purposes)
 	new_card = ((((new_card - 1) & 3) + 1) == flush_suit) ? 
@@ -174,8 +181,7 @@ int64_t add_card_to_id_flush_ranks_4(int64_t id, int new_card)
 
 int eval_flush_ranks(int64_t id)
 {
-	int pocket[4] = {0, 0, 0, 0}, board[5] = {0, 0, 0, 0, 0}, 
-		n_pocket = 0, n_board = 0;
+	int pocket[4], board[5], n_pocket, n_board;
 	unpack64(id, pocket, board, n_pocket, n_board);
 	if (!pocket[0] || !pocket[1] || !board[0] || !board[1] || !board[2])
 	{	
@@ -218,9 +224,8 @@ int eval_flush_ranks(int64_t id)
 
 int64_t add_card_to_id_no_flush(int64_t id, int new_card)
 {
-	int pocket[4] = {0, 0, 0, 0}, board[5] = {0, 0, 0, 0, 0},
-		n_rank[14] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		n_pocket = 0, n_board = 0, i;
+	int pocket[4], board[5], n_pocket, n_board, i,
+		n_rank[14] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	new_card = 1 + ((new_card - 1) >> 2) & 0xF;
 	unpack64(id, pocket, board, n_pocket, n_board);
 	for (i = 0; i < n_pocket; i++)
@@ -284,19 +289,11 @@ int eval_cactus_no_flush(int c1, int c2, int c3, int c4, int c5)
 
 int eval_no_flush(int64_t id)
 {
-	const int pocket_perms[2][6] = {{0, 0, 0, 1, 1, 2}, {1, 2, 3, 2, 3, 3}};
-	const int n_pocket_perms = 6;
-	const int board_perms[10][3] = {
-		{0, 1, 2}, // 3, 4, 5
-		{0, 1, 3}, {0, 2, 3}, {1, 2, 3}, // 4, 5
-		{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}; // 5
 
-	int pocket[4] = {0, 0, 0, 0}, board[5] = {0, 0, 0, 0, 0}, 
-		n_pocket = 0, n_board = 0;
+	int pocket[4], board[5], n_pocket, n_board, n, n_board_perms;
 	unpack64(id, pocket, board, n_pocket, n_board);
-
-	int n = n_pocket + n_board;
-	int n_board_perms = n == 9 ? 10 : n == 8 ? 4 : n == 7 ? 1 : -1;
+	n = n_pocket + n_board;
+	n_board_perms = n == 9 ? 10 : n == 8 ? 4 : n == 7 ? 1 : -1;
 	if (n_pocket < 4 || n_board < 3)
 	{	
 		std::cout << "\neval_no_flush() encountered invalid # of cards, shouldn't happen...";
@@ -315,8 +312,8 @@ int eval_no_flush(int64_t id)
 	{
 		for (nb = 0; nb < n_board_perms; nb++)
 		{
-			q = eval_cactus_no_flush(pocket[pocket_perms[0][np]],
-				pocket[pocket_perms[1][np]],
+			q = eval_cactus_no_flush(pocket[pocket_perms[np][0]],
+				pocket[pocket_perms[np][1]],
 				board[board_perms[nb][0]],
 				board[board_perms[nb][1]],
 				board[board_perms[nb][2]]);
@@ -478,12 +475,8 @@ void generate_handranks(std::vector<int> &hand_ranks)
 	std::replace(hand_ranks.begin(), hand_ranks.begin() + offset_fr1 - 1, 4, offset_fr4);
 
 	std::cout << "\n\nEvaluating flush ranks (suit #1)...\n";
-	try {
-		process_ids(id_fr1, offset_fr1, 0, hand_ranks,
-			add_card_to_id_flush_ranks_1, eval_flush_ranks);
-	} catch (std::exception &e) {
-		std::cout << e.what() << "\n";
-	}
+	process_ids(id_fr1, offset_fr1, 0, hand_ranks,
+		add_card_to_id_flush_ranks_1, eval_flush_ranks);
 
 	std::cout << "\n\nEvaluating flush ranks (suit #2)...\n";
 	process_ids(id_fr2, offset_fr2, 0, hand_ranks,
@@ -551,36 +544,8 @@ int *load_old_handranks(const char *filename)
 		return NULL;
 }
 
-int eval_5cards(int c1, int c2, int c3, int c4, int c5)
-{
-    int q;
-    int s;
-    q = (c1 | c2 | c3 | c4 | c5) >> 16;
-    if (c1 & c2 & c3 & c4 & c5 & 0xF000) // check for flushes and straight-flushes
-		return ( flushes[q] );
-    s = unique5[q]; // check for straights and high-card hands
-    if (s) 
-    	return s;
-    q = (c1 & 0xFF) * (c2 & 0xFF) * (c3 & 0xFF) * (c4 & 0xFF) * (c5 & 0xFF);
-    q = cactus_findit(q);
-    return values[q];
-}
-
-int eval_5hand(int *hand)
-{
-    int c1, c2, c3, c4, c5;
-    c1 = *hand++; c2 = *hand++; c3 = *hand++; c4 = *hand++; c5 = *hand;
-    return eval_5cards(c1, c2, c3, c4, c5);
-}
-
 int eval_789(int *hand_ranks, int *cards, int n)
 {
-	const int pocket_perms[2][6] = {{0, 0, 0, 1, 1, 2}, {1, 2, 3, 2, 3, 3}};
-	const int n_pocket_perms = 6;
-	const int board_perms[10][3] = {
-		{0, 1, 2}, // 3, 4, 5
-		{0, 1, 3}, {0, 2, 3}, {1, 2, 3}, // 4, 5
-		{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}; // 5
 	int n_board_perms = n == 9 ? 10 : n == 8 ? 4 : n == 7 ? 1 : -1;
 	if (n_board_perms == -1)
 		return -1;
@@ -590,8 +555,8 @@ int eval_789(int *hand_ranks, int *cards, int n)
 		for (nb = 0; nb < n_board_perms; nb++)
 		{
 			int subhand[5];
-			subhand[0] = cards[pocket_perms[0][np]];
-			subhand[1] = cards[pocket_perms[1][np]];
+			subhand[0] = cards[pocket_perms[np][0]];
+			subhand[1] = cards[pocket_perms[np][1]];
 			subhand[2] = cards[4 + board_perms[nb][0]];
 			subhand[3] = cards[4 + board_perms[nb][1]];
 			subhand[4] = cards[4 + board_perms[nb][2]];
@@ -752,11 +717,8 @@ void test_straight_flush()
 	int cards[9] = {1, 2, 3, 5, 6, 9, 13, 17, 21};
 	int64_t id = 0LL;
 	for (int i = 0; i < 9; i++)
-	{
 		id = add_card_to_id_flush_ranks_1(id, cards[i]);
-	}
-	int pocket[4] = {0, 0, 0, 0}, board[5] = {0, 0, 0, 0, 0}, 
-		n_pocket = 0, n_board = 0;
+	int pocket[4], board[5], n_pocket, n_board;
 	unpack64(id, pocket, board, n_pocket, n_board);
 	std::cout << "\tPocket:";
 	for (int i = 0; i < n_pocket; i++)
@@ -792,8 +754,7 @@ void test_no_flush()
 {
 	int64_t id = 13472513442443LL;
 	id = add_card_to_id_no_flush(id, 1);
-	int pocket[4] = {0, 0, 0, 0}, board[5] = {0, 0, 0, 0, 0}, 
-		n_pocket = 0, n_board = 0;
+	int pocket[4], board[5], n_pocket, n_board;
 	unpack64(id, pocket, board, n_pocket, n_board);
 	std::cout << "\tPocket:";
 	for (int i = 0; i < n_pocket; i++)
@@ -805,38 +766,14 @@ void test_no_flush()
 	std::cout << "eval: " << eval_no_flush(id) << "\n";
 }
 
-void temp()
-{
-	// int64_t id = 145249988232905092LL;
-	// int pocket[4] = {0, 0, 0, 0}, board[5] = {0, 0, 0, 0, 0}, 
-	// 	n_pocket = 0, n_board = 0;
-	// unpack64(id, pocket, board, n_pocket, n_board);
-
-	int pocket[4] = {1, 2, 3, 4}, board[5] = {5, 6, 7, 8, 9},
-		n_pocket = 4, n_board = 5;
-	int64_t id = pack64(pocket, board);
-
-	std::cout << "\tPocket:";
-	for (int i = 0; i < n_pocket; i++)
-		std::cout << " " << pocket[i] << "";
-	std::cout << "\n\tBoard:";
-	for (int i = 0; i < n_board; i++)
-		std::cout << " " << board[i] << "";
-	std::cout << "\n";
-	std::cout << "eval: " << eval_flush_suits(id) << "\n";
-}
-
 void test_flush_hand()
 {
 	// ['2c', '2d', '2h', '3c', '4c', '4d', '4h', '5c', '7c']
 	int cards[9] = {1, 2, 3, 5, 9, 10, 11, 13, 21};
 	int64_t id = 0LL;
 	for (int i = 0; i < 9; i++)
-	{
 		id = add_card_to_id_flush_ranks_1(id, cards[i]);
-	}
-	int pocket[4] = {0, 0, 0, 0}, board[5] = {0, 0, 0, 0, 0}, 
-		n_pocket = 0, n_board = 0;
+	int pocket[4], board[5], n_pocket, n_board;
 	unpack64(id, pocket, board, n_pocket, n_board);
 	std::cout << "\tPocket:";
 	for (int i = 0; i < n_pocket; i++)
@@ -865,18 +802,16 @@ int main()
 	std::vector<int> hand_ranks;
 	std::cout.imbue(std::locale(std::locale(), new commas_locale));
 
-	// test_flush_suits();
-	// test_straight_flush();
-
-	// test_flush_hand();
-
-	// temp();
-	// test_flush_ranks_1();
-	// test_no_flush();
-
 	generate_handranks(hand_ranks);
 	save_handranks(hand_ranks, "hr9_cpp.dat");
 
 	test_all_handranks("hr9_cpp.dat");
-	// test_handranks("hr9_cpp.dat");
+
+	// test_flush_suits();
+	// test_straight_flush();
+	// test_flush_hand();
+	// temp();
+	// test_flush_ranks_1();
+	// test_no_flush();
+	// test_handranks("hr9_cpp.dat");	
 }
