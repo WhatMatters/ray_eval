@@ -42,7 +42,7 @@ const char HandRanks[][16] = {"BAD!!","High Card","Pair","Two Pair","Three of a 
 #define min(a, b)  			(((a) < (b)) ? (a) : (b))
 #define max(a, b)  			(((a) > (b)) ? (a) : (b))
 
-#define HR9_SIZE            620518328
+#define HR9_SIZE            347382723
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -480,7 +480,7 @@ int *load_handranks(const char *filename)
 	FILE *f = fopen(filename, "rb");
 	if (f)
 	{
-		load_file(_HR, sizeof(_HR), 1, f);
+		load_file((char *)_HR, sizeof(_HR), 1, f);
 		fclose(f);
 		return _HR;
 	}
@@ -492,15 +492,14 @@ int *HR9 = 0;
 
 int *load_handranks_9(const char *filename)
 {
-    int *_HR9 = (int *) malloc(HR9_SIZE * sizeof(int));
 	FILE *f = fopen(filename, "rb");
 	if (f)
 	{
-		load_file(_HR9, sizeof(int), HR9_SIZE, f);
+		int size = 0;
+		fread(&size, sizeof(int), 1, f);
+    	int *_HR9 = (int *) malloc(size * sizeof(int));
+		load_file((char *)_HR9, sizeof(int), size, f);
 		fclose(f);
-		// int i;
-		// for (i = 1000; i < 1100; i++)
-		// 	printf("%d ", _HR9[i]);
 		return _HR9;
 	}
 	else
@@ -659,6 +658,9 @@ int eval_monte_carlo_omaha_9(int N, int *board, int n_board,
 	int available_cards[52];
 	if (n_board != 3 && n_board != 4 && n_board != 5)
 		return 1;
+	int fs_offset = (n_board == 5) ? 53 : ((n_board == 4) ? HR9[53] : HR9[HR9[53]]);
+	int snf_offset = (n_board == 5) ? (HR9[0] + 53) : 
+		((n_board == 4) ? HR9[HR9[0] + 53] : HR9[HR9[HR9[0] + 53]]);
 	for (i = 0; i < n_board; i++)
 	{
 		if (board[i] == 255)
@@ -683,27 +685,30 @@ int eval_monte_carlo_omaha_9(int N, int *board, int n_board,
 		random_sample_52_ross(n_available, n_mask, sample);
 		for (j = 0; j < n_mask; j++)
 			cards[mask[j]] = available_cards[sample[j]];
-		int path = 53;
+		int board_fs = fs_offset;
+		int board_snf = snf_offset;
 		for (j = 0; j < n_board; j++)
-			path = HR9[path + cards[j]];
+		{
+			board_fs = HR9[board_fs + cards[j]];
+			board_snf = HR9[board_snf + cards[j]];
+		}
 		int *player_cards = cards + n_board;
 		for (k = 0; k < n_players; k++)
 		{
-			// int score = HR9[HR9[HR9[HR9[
-			// 	path + 
-			// 	player_cards[0]] + 
-			// 	player_cards[1]] +
-			// 	player_cards[2]] +
-			// 	player_cards[3]];
+			int fs = HR9[HR9[HR9[HR9[board_fs + player_cards[0]] + 
+				player_cards[1]] + player_cards[2]] + player_cards[3]];
+			int score = HR9[HR9[HR9[HR9[board_snf + player_cards[0]] + 
+				player_cards[1]] + player_cards[2]] + player_cards[3]];
+			if (fs < 130000000)
+			{
+				int sf = fs + 53;
+				for (j = 0; j < n_board; j++)
+					sf = HR9[sf + cards[j]];
+				sf = HR9[HR9[HR9[HR9[sf + player_cards[0]] + 
+					player_cards[1]] + player_cards[2]] + player_cards[3]];
+				score = max(score, sf);
+			}
 
-			int player_path = HR9[HR9[HR9[HR9[53 + player_cards[0]]
-				+ player_cards[1]]
-				+ player_cards[2]]
-				+ player_cards[3]], score = 0;
-			for (j = 0; j < n_board; j++)
-				player_path = HR9[player_path + cards[j]];
-			score = player_path;
-			
 			scores[k] = score;
 			if (score > best_score)
 			{

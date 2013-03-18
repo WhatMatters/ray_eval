@@ -77,7 +77,7 @@ def parse_pockets(pockets, game):
     if n_players <= 1 or n_players > 10:
         raise ValueError('Invalid number of players.')
     i_pockets = []
-    map(i_pockets.extend, map(parse_pocket, pockets))
+    map(i_pockets.extend, map(lambda p: parse_pocket(p, game), pockets))
     return i_pockets
 
 

@@ -4,7 +4,9 @@
 #include <vector>
 #include <iomanip>
 #include <locale>
+#include <string>
 #include <tr1/unordered_map>
+#include <exception>
 
 #include "arrays.h"
 #include "load_file.h"
@@ -12,7 +14,8 @@
 #define MAX(x, y) 	((x) > (y) ? (x) : (y))
 #define MIN(x, y) 	((x) < (y) ? (x) : (y))
 
-const int ANY_CARD = 1;	// dummy placeholder for flush ranks eval
+const int ANY_CARD = 1;	// placeholder for flush ranks eval
+const int SKIP_BOARD = 53; // placeholder for 7-8 card hands
 
 const int pocket_perms[6][2] = {
 	{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}
@@ -23,6 +26,16 @@ const int board_perms[10][3] = {
 	{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}	// 5 cards
 }; 	
 const int n_pocket_perms = 6;
+
+void skip_board(int *board, int &n_board)
+{
+	int temp[5] = {0, 0, 0, 0, 0};
+	n_board = 0;
+	for (int i = 0; i < 5; i++)
+		if (board[i] != SKIP_BOARD)
+			temp[n_board++] = board[i];
+	memcpy(board, temp, 5 * sizeof(int));
+}
 
 int cactus_to_ray(int holdrank)
 {
@@ -56,10 +69,10 @@ int count_cards(int64_t id)
 
 void add_card(int new_card, int *pocket, int *board, int &n_pocket, int &n_board)
 {
-	if (n_pocket < 4)
-		pocket[n_pocket++] = new_card;
-	else
+	if (n_board < 5)
 		board[n_board++] = new_card;
+	else
+		pocket[n_pocket++] = new_card;
 }
 
 void unpack64(int64_t id, int *pocket, int *board, int &n_pocket, int &n_board)
@@ -73,10 +86,10 @@ void unpack64(int64_t id, int *pocket, int *board, int &n_pocket, int &n_board)
 	{
 		if ((card = (int) ((id >> (7 * i)) & 0x7F)) != 0)
 		{
-			if (i < 4)
-				pocket[n_pocket++] = card;
-			else
+			if (i < 5)
 				board[n_board++] = card;
+			else
+				pocket[n_pocket++] = card;
 		}
 	}
 }
@@ -88,21 +101,38 @@ int64_t pack64(int *pocket, int *board)
 	std::reverse(pocket, pocket + 4);
 	std::reverse(board, board + 5);
 
-	return ((int64_t) pocket[0] +
-		 ((int64_t) pocket[1] << 7) +
-		 ((int64_t) pocket[2] << 14) + 
-		 ((int64_t) pocket[3] << 21) +
-		 ((int64_t) board[0] << 28) +
-		 ((int64_t) board[1] << 35) +
-		 ((int64_t) board[2] << 42) +
-		 ((int64_t) board[3] << 49) +
-		 ((int64_t) board[4] << 56));    
+	return ((int64_t) board[0] +
+		 ((int64_t) board[1] << 7) +
+		 ((int64_t) board[2] << 14) + 
+		 ((int64_t) board[3] << 21) +
+		 ((int64_t) board[4] << 28) +
+		 ((int64_t) pocket[0] << 35) +
+		 ((int64_t) pocket[1] << 42) +
+		 ((int64_t) pocket[2] << 49) +
+		 ((int64_t) pocket[3] << 56));    
+}
+
+void print_id(int64_t id, bool indent=false)
+{
+	int board[5], pocket[4], n_pocket, n_board;
+	unpack64(id, pocket, board, n_pocket, n_board);
+	std::cout << (indent ? "\t" : "") << "id:       " << id << "\n";
+	std::cout << (indent ? "\t" : "") << "n_board:  " << n_board << "\n";
+	std::cout << (indent ? "\t" : "") << "board:    [";
+	for (int i = 0; i < n_board; i++)
+		std::cout << board[i] << (((i + 1) == n_board) ? "" : ", ");
+	std::cout << "]\n";
+	std::cout << (indent ? "\t" : "") << "n_pocket:  " << n_pocket << "\n";
+	std::cout << (indent ? "\t" : "") << "pocket:   [";
+	for (int i = 0; i < n_pocket; i++)
+		std::cout << pocket[i] << (((i + 1) == n_pocket) ? "" : ", ");
+	std::cout << "]\n";
 }
 
 int64_t add_card_to_id_flush_suits(int64_t id, int new_card)
 {
 	int pocket[4], board[5], n_pocket, n_board;
-	new_card = ((new_card - 1) & 3) + 1;
+	new_card = new_card == 0 ? SKIP_BOARD : ((new_card - 1) & 3) + 1;
 	unpack64(id, pocket, board, n_pocket, n_board);
 	add_card(new_card, pocket, board, n_pocket, n_board);
 	return pack64(pocket, board);
@@ -116,7 +146,8 @@ int eval_flush_suits(int64_t id)
 	for (int i = 0; i < n_pocket; i++)
 		nsp[pocket[i]] = MIN(nsp[pocket[i]] + 1, 2);
 	for (int i = 0; i < n_board; i++)
-		nsb[board[i]] = MIN(nsb[board[i]] + 1, 3);
+		if (board[i] != SKIP_BOARD)
+			nsb[board[i]] = MIN(nsb[board[i]] + 1, 3);
 	for (int suit = 1; suit <= 4; suit++)
 		if ((nsp[suit] + nsb[suit]) >= 5)
 			return suit;
@@ -126,19 +157,35 @@ int eval_flush_suits(int64_t id)
 int64_t add_card_to_id_flush_ranks(int64_t id, int new_card, int flush_suit)
 {
 	int pocket[4], board[5], n_pocket, n_board, nsp = 0, nsb = 0, i;
+	bool debug = false;
 
 	// the rank is 2-14 if suited or 1 otherwise (for sorting purposes)
-	new_card = ((((new_card - 1) & 3) + 1) == flush_suit) ? 
-		(2 + ((new_card - 1) >> 2) & 0xF) : ANY_CARD;
+	if (new_card == 0)
+		new_card = SKIP_BOARD;
+	else
+		new_card = ((((new_card - 1) & 3) + 1) == flush_suit) ? 
+			(2 + ((new_card - 1) >> 2) & 0xF) : ANY_CARD;
+
+	if (debug) std::cout << "old deck:\n";
+	if (debug) print_id(id, true);
+	if (debug) std::cout << "new_card: " << new_card << "\n";
 
 	unpack64(id, pocket, board, n_pocket, n_board);
 
 	for (i = 0; i < n_pocket; i++)
-		if (pocket[i] != ANY_CARD && pocket[i] == new_card) 
+		if (pocket[i] != ANY_CARD && pocket[i] != SKIP_BOARD && pocket[i] == new_card)
+		{
+			if (debug) std::cout << "halting, duplicate pocket: " << pocket[i] << "\n";
 			return 0;
+		}
 	for (i = 0; i < n_board; i++)
-		if (board[i] != ANY_CARD && board[i] == new_card)
+		if (board[i] != ANY_CARD && board[i] != SKIP_BOARD && board[i] == new_card)
+		{
+			if (debug) std::cout << "halting, duplicate board: " << board[i] << "\n";
 			return 0;
+		}
+
+	if (debug) std::cout << "no duplicates, adding card...\n";
 
 	add_card(new_card, pocket, board, n_pocket, n_board);
 
@@ -146,15 +193,24 @@ int64_t add_card_to_id_flush_ranks(int64_t id, int new_card, int flush_suit)
 		if (pocket[i] != ANY_CARD && pocket[i] != 0) 
 			nsp++;
 	for (i = 0; i < n_board; i++)
-		if (board[i] != ANY_CARD && board[i] != 0)
+		if (board[i] != ANY_CARD && board[i] != SKIP_BOARD && board[i] != 0)
 			nsb++;
 
-	if (n_pocket >= 4 && nsp < 2)
+	if (debug) std::cout << "nsp = " << nsp << ", nsb = " << nsb << "\n";
+
+	if (n_board == 4 && nsb <= 1)
+		return 0;
+	if (n_board == 5 && nsb <= 2)
+		return 0;
+	if (n_board == 5 && n_pocket == 3 && nsp == 0)
+		return 0;
+	if (n_board == 5 && n_pocket == 4 && nsp <= 1)
 		return 0;
 
-	if (n_pocket >= 4 && n_board >= 2)
-		if ((5 - MAX(nsp, 2) - MAX(nsb, 3)) > (9 - n_pocket - n_board))
-			return 0;
+	if (debug) std::cout << "packing...\n";
+
+	if (debug) std::cout << "new deck:\n";
+	if (debug) print_id(pack64(pocket, board), true);
 
 	return pack64(pocket, board);
 }
@@ -183,6 +239,7 @@ int eval_flush_ranks(int64_t id)
 {
 	int pocket[4], board[5], n_pocket, n_board;
 	unpack64(id, pocket, board, n_pocket, n_board);
+	skip_board(board, n_board);
 	if (!pocket[0] || !pocket[1] || !board[0] || !board[1] || !board[2])
 	{	
 		std::cout << "\neval_flush_ranks(): " << id << ": zero encountered.\n";
@@ -226,14 +283,19 @@ int64_t add_card_to_id_no_flush(int64_t id, int new_card)
 {
 	int pocket[4], board[5], n_pocket, n_board, i,
 		n_rank[14] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	new_card = 1 + ((new_card - 1) >> 2) & 0xF;
+	if (new_card == 0)
+		new_card = SKIP_BOARD;
+	else
+		new_card = 1 + ((new_card - 1) >> 2) & 0xF;
 	unpack64(id, pocket, board, n_pocket, n_board);
 	for (i = 0; i < n_pocket; i++)
 		n_rank[pocket[i]]++;
 	for (i = 0; i < n_board; i++)
-		n_rank[board[i]]++;
+		if (board[i] != SKIP_BOARD)
+			n_rank[board[i]]++;
 	add_card(new_card, pocket, board, n_pocket, n_board);
-	n_rank[new_card]++;
+	if (new_card != SKIP_BOARD)
+		n_rank[new_card]++;
 	for (i = 1; i <= 13; i++)
 		if (n_rank[i] > 4)
 			return 0;
@@ -292,11 +354,12 @@ int eval_no_flush(int64_t id)
 
 	int pocket[4], board[5], n_pocket, n_board, n, n_board_perms;
 	unpack64(id, pocket, board, n_pocket, n_board);
+	skip_board(board, n_board);
 	n = n_pocket + n_board;
 	n_board_perms = n == 9 ? 10 : n == 8 ? 4 : n == 7 ? 1 : -1;
 	if (n_pocket < 4 || n_board < 3)
 	{	
-		std::cout << "\neval_no_flush() encountered invalid # of cards, shouldn't happen...";
+		std::cout << "\neval_no_flush() encountered invalid # of cards, shouldn't happen...\n";
 		return 0;
 	}
 
@@ -324,6 +387,14 @@ int eval_no_flush(int64_t id)
 	return cactus_to_ray(best);
 }
 
+/*
+	Allow to "skip" a board card only when there are no cards on the
+	table or just one skipped. A board card can be skipped by passing
+	the offset of 0, however internally it will be stored as 53. 
+	Skipping is only allowed for the first and second cards (essentially, 
+	we just start off from a different offset).
+*/
+
 void generate_ids(size_t size, std::vector<int64_t> &id_list,
 	int64_t (*add_card_to_id) (int64_t, int))
 
@@ -339,16 +410,20 @@ void generate_ids(size_t size, std::vector<int64_t> &id_list,
 	for (int n_cards = 1; n_cards <= 8; n_cards++)
 	{
 		std::cout << "\nGenerating " << n_cards << "-card IDs:\n";
-		for (int i = 0; i < id_queue_1.size(); i++)
+
+		int n1 = id_queue_1.size(); // LOL, if we don't do this, expect nasty bugs
+		for (int i = 0; i < n1; i++)
 		{
 			std::cout << "\r\t" << "Processing ID " << i + 1 << " / " <<
-				id_queue_1.size() << "...";
-			int64_t id = id_queue_1[i];
+				n1 << "...";
 
-			for (int new_card = 1; new_card <= 52; new_card++)
+			int64_t id = id_queue_1[i];
+			int min_card = (n_cards <= 2) ? 0 : 1; // board skipping
+			for (int new_card = min_card; new_card <= 52; new_card++)
 				if ((new_id = (*add_card_to_id)(id, new_card)) != 0)
 					id_queue_2.push_back(new_id);
 		}
+		std::cout << "\n\t" << id_queue_1.size() << ", " << id_queue_2.size() << "\n";
 		size_t size = id_queue_2.size();
 		std::cout << "\n\tGenerated " << id_queue_2.size() << " IDs." <<
 			"\n\tSorting and dropping duplicates...";
@@ -369,6 +444,40 @@ void generate_ids(size_t size, std::vector<int64_t> &id_list,
 	std::vector<int64_t>().swap(id_queue_2);
 }
 
+/*
+
+GLOBAL
+
+0-53
+	0: flush ranks base offset (add suit * 53 to get true offset)
+	1: 
+
+FLUSH_RANKS
+	0-53: 			reserved
+	53*1 + 1-52:	suit 1 starting point
+	53*2 + 1-52:	suit 2 starting point
+	53*3 + 1-52:	suit 3 starting point
+	53*4 + 1-52:	suit 4 starting point
+	>= 53*5: 		normal layers
+
+FLUSH_RANKS SHIFTING
+
+	Assume: there are only 2 ranks, 1-2 and 4 suits, 1-4
+	Denote:  -- , [1], [2] ~ any card, rank 1, rank 2
+	        [b], [d] ~ base offset, dummy slot
+
+		      [b]  1(1) 1(2) 1(3) 1(4) 2(1) 2(2) 2(3) 2(4) [d]  [d]  [d]
+
+	suit 1:        [1]   --  --   --   [2]  --   --   --   --   --   -- 
+	suit 2:         --  [1]  --   --   --   [2]  --   --   --   --   -- 
+	suit 4:         --   --  [1]  --   --   --   [2]  --   --   --   -- 
+	suit 3:         --   --  --   [1]  --   --   --   [2]  --   --   -- 
+*/
+
+// void process_ids(std::vector<int64_t> ids, int offset, int offset_value,
+// 	int *hand_ranks, int64_t (*add_card_to_id)(int64_t, int),
+// 	int (*eval_id)(int64_t), std::tr1::unordered_map<int, int> map=
+// 	std::tr1::unordered_map<int, int>())
 void process_ids(std::vector<int64_t> ids, int offset, int offset_value,
 	std::vector<int> &hand_ranks, int64_t (*add_card_to_id)(int64_t, int),
 	int (*eval_id)(int64_t), std::tr1::unordered_map<int, int> map=
@@ -401,16 +510,8 @@ void process_ids(std::vector<int64_t> ids, int offset, int offset_value,
 		num_cards = count_cards(id);
 		hand_ranks[id_index] = offset; // safety backup
 
-		if (num_cards == 7 || num_cards == 8)
-		{
-			int value = (*eval_id)(id);
-			// // we have to check this for example when constructing flush_ranks
-			// // and a partial hand may not be a flush at all
-			// hand_ranks[id_index] = (value != -1) ? value : offset;
-			hand_ranks[id_index] = map.count(value) ? map[value] : value;
-		}
-
-		for (new_card = 1; new_card <= 52; new_card++)
+		int min_card = (num_cards <= 1) ? 0 : 1; // board skipping
+		for (new_card = min_card; new_card <= 52; new_card++)
 		{			
 			new_id = (*add_card_to_id)(id, new_card);
 			if (new_id && ((num_cards + 1) == 9))
@@ -421,13 +522,14 @@ void process_ids(std::vector<int64_t> ids, int offset, int offset_value,
 			else if (new_id)
 				hand_ranks[id_index + new_card] = offset + 53 + hash_table[new_id] * 53;
 			else
-				hand_ranks[id_index + new_card] = offset; // TODO: QUESTIONABLE
+				hand_ranks[id_index + new_card] = offset; // < 9 cards and id is not valid
 		}
 	}
 
 }
 
-void generate_handranks(std::vector<int> &hand_ranks)
+// int generate_handranks(int *hand_ranks)
+int generate_handranks(std::vector<int> &hand_ranks)
 {
 	std::vector<int64_t> id_fs, id_fr1, id_fr2, id_fr3, id_fr4, id_nf;
 
@@ -449,7 +551,7 @@ void generate_handranks(std::vector<int> &hand_ranks)
 	generate_ids(10e6, id_fr4, add_card_to_id_flush_ranks_4);
 
 	std::cout << "\n\n>> IDs for non-flush hands... \n";	
-	generate_ids(50e6, id_nf, add_card_to_id_no_flush);
+	generate_ids(100e6, id_nf, add_card_to_id_no_flush);
 
 	int n_fs = id_fs.size(), n_fr1 = id_fr1.size(), n_fr2 = id_fr2.size(),
 		n_fr3 = id_fr3.size(), n_fr4 = id_fr4.size(), n_nf = id_nf.size();
@@ -465,6 +567,7 @@ void generate_handranks(std::vector<int> &hand_ranks)
 	offset_nf = offset_fr4 + 53 + n_fr4 * 53;
 	max_rank = offset_nf + 53 + n_nf * 53;
 
+	std::cout << "\n\nMAX_RANK = " << max_rank << "\n";
 	std::vector<int>(max_rank, 0).swap(hand_ranks);
 
 	int i, num_cards, new_card, new_index, id_index;
@@ -479,12 +582,6 @@ void generate_handranks(std::vector<int> &hand_ranks)
 	map_fs.insert(std::tr1::unordered_map<int, int>::value_type(4, offset_fr4));
 	process_ids(id_fs, offset_fs, offset_nf, hand_ranks,
 		add_card_to_id_flush_suits, eval_flush_suits, map_fs);
-	// std::replace(hand_ranks.begin(), hand_ranks.begin() + offset_fr1 - 1, -1, offset_nf);
-	// std::replace(hand_ranks.begin(), hand_ranks.begin() + offset_fr1 - 1, 1, offset_fr1);
-	// std::replace(hand_ranks.begin(), hand_ranks.begin() + offset_fr1 - 1, 2, offset_fr2);
-	// std::replace(hand_ranks.begin(), hand_ranks.begin() + offset_fr1 - 1, 3, offset_fr3);
-	// std::replace(hand_ranks.begin(), hand_ranks.begin() + offset_fr1 - 1, 4, offset_fr4);
-
 
 	std::cout << "\n\nEvaluating flush ranks (suit #1)...\n";
 	std::tr1::unordered_map<int, int> map_fr1;
@@ -516,7 +613,11 @@ void generate_handranks(std::vector<int> &hand_ranks)
 	process_ids(id_nf, offset_nf, 0, hand_ranks,
 		add_card_to_id_no_flush, eval_no_flush, map_nf);
 
+	// hand_ranks.resize(max_rank);
+
 	std::cout << "\n\nDone.\n";
+
+	return max_rank;
 }
 
 void save_handranks(std::vector<int> hand_ranks, const char *filename)
@@ -528,21 +629,26 @@ void save_handranks(std::vector<int> hand_ranks, const char *filename)
 		std::cout << "\tError opening file.\n";
 	else
 	{
+		int header[1];
+		header[0] = hand_ranks.size(); // store the size in the first 4 bytes
+		out.write(reinterpret_cast<const char *>(header), sizeof(int));
 		out.write(reinterpret_cast<const char *>((int *) &hand_ranks[0]), 
 			sizeof(int) * hand_ranks.size());
-		std::cout << "\t" << hand_ranks.size() << " hand ranks written.\n";
+		std::cout << "\t" << hand_ranks.size() << " hand ranks written (+header).\n";
 	}
 }
 
-#define NUM_RANKS_NEW 347382723
+// #define NUM_RANKS_NEW 373250539
 
 int *load_new_handranks(const char *filename)
 {
-	int *hand_ranks = (int *) malloc(NUM_RANKS_NEW * sizeof(int));
 	FILE *f = fopen(filename, "rb");
 	if (f)
 	{
-		load_file((char *) hand_ranks, sizeof(int), NUM_RANKS_NEW, f);
+		int size = 0;
+		fread(&size, sizeof(int), 1, f); // the size is stored in the first 4 bytes
+		int *hand_ranks = (int *) malloc(size * sizeof(int));
+		load_file((char *) hand_ranks, sizeof(int), size, f);
 		fclose(f);
 		return hand_ranks;
 	}
@@ -566,171 +672,114 @@ int *load_old_handranks(const char *filename)
 		return NULL;
 }
 
-int eval_789(int *hand_ranks, int *cards, int n)
-{
-	int n_board_perms = n == 9 ? 10 : n == 8 ? 4 : n == 7 ? 1 : -1;
-	if (n_board_perms == -1)
-		return -1;
-	int np, nb, best = -1, score = 0;
-	for (np = 0; np < n_pocket_perms; np++)
-	{
-		for (nb = 0; nb < n_board_perms; nb++)
-		{
-			int subhand[5];
-			subhand[0] = cards[pocket_perms[np][0]];
-			subhand[1] = cards[pocket_perms[np][1]];
-			subhand[2] = cards[4 + board_perms[nb][0]];
-			subhand[3] = cards[4 + board_perms[nb][1]];
-			subhand[4] = cards[4 + board_perms[nb][2]];
-			score = 53;
-			for (int i = 0; i < 5; i++)
-				score = hand_ranks[score + subhand[i]];
-			score = hand_ranks[score];
-			if (score > best)
-				best = score;
-		}
-	}
-	return best;
-}
-
-
 void test_all_handranks(const char *filename)
 {
 	int *HR_new = load_new_handranks(filename);
 	int *HR_old = load_old_handranks("HandRanks.dat");
 
-	int c[9];
-	int64_t N;
-	int64_t n;
+	int c[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+	int64_t n = 0;
+	int64_t N[3] = {133784560LL, 752538150LL,
+		3679075400LL}; // C(52, 7), C(52, 8), C(52, 9)
+	int min0[3] = {0,  0,  1};
+	int max0[3] = {0,  0,  52};
+	int min1[3] = {0,  1,  1};
+	int max1[3] = {0,  52, 52};
+	int n_board_perms[3] = {1, 4, 10};
+	int board_paths[10];
 
-	std::cout << "\nChecking all 7-card sorted combinations...\n";
-	N = 133784560LL; // C(52, 7)
-	n = 0;
-	for (c[0] = 1; c[0] <= 52; c[0]++)
-		for (c[1] = c[0] + 1; c[1] <= 52; c[1]++)
-			for (c[2] = c[1] + 1; c[2] <= 52; c[2]++)
-				for (c[3] = c[2] + 1; c[3] <= 52; c[3]++)
-					for (c[4] = c[3] + 1; c[4] <= 52; c[4]++)
-						for (c[5] = c[4] + 1; c[5] <= 52; c[5]++)
-							for (c[6] = c[5] + 1; c[6] <= 52; c[6]++)
+	for (int k = 0; k < 3; k++)
+	{
+		std::cout << "\nChecking all " << (7 + k) << "-card sorted combinations...\n";
+		n = 0;
+
+		for (c[0] = min0[k]; c[0] <= max0[k]; c[0]++)
+		{
+			int fs0 = HR_new[53 + c[0]]; // flush suit
+			int snf0 = HR_new[HR_new[0] + 53 + c[0]]; // score no flush
+			for (c[1] = (min1[k] == 0) ? 0 : (c[0] + 1); c[1] <= max1[k]; c[1]++)
+			{
+				int fs1 = HR_new[fs0 + c[1]];
+				int snf1 = HR_new[snf0 + c[1]];
+				for (c[2] = c[1] + 1; c[2] <= 52; c[2]++)
+				{
+					int fs2 = HR_new[fs1 + c[2]];
+					int snf2 = HR_new[snf1 + c[2]];
+					for (c[3] = c[2] + 1; c[3] <= 52; c[3]++)
+					{
+						int fs3 = HR_new[fs2 + c[3]];
+						int snf3 = HR_new[snf2 + c[3]];
+						for (c[4] = c[3] + 1; c[4] <= 52; c[4]++)
+						{
+							int fs4 = HR_new[fs3 + c[4]];
+							int snf4 = HR_new[snf3 + c[4]];
+
+							for (int nb = 0; nb < n_board_perms[k]; nb++)
+								board_paths[nb] = HR_old[HR_old[HR_old[53 + 
+									c[(2 - k) + board_perms[nb][0]]] + 
+									c[(2 - k) + board_perms[nb][1]]] +
+									c[(2 - k) + board_perms[nb][2]]];
+
+							for (c[5] = c[4] + 1; c[5] <= 52; c[5]++)
 							{
-								int offset = 53;
-								for (int i = 0; i < 7; i++)
-									offset = HR_new[offset + c[i]];
-								offset = HR_new[offset]; // partial match
-								int score_no_flush = 0;
-								if (offset < 120000000)
+								int fs5 = HR_new[fs4 + c[5]];
+								int snf5 = HR_new[snf4 + c[5]];
+								for (c[6] = c[5] + 1; c[6] <= 52; c[6]++)
 								{
-									score_no_flush = HR_new[0] + 53;
-									for (int i = 0; i < 7; i++)
-										score_no_flush = HR_new[score_no_flush + c[i]];
-									score_no_flush = HR_new[score_no_flush]; // partial match
-								}
-								int score_new = offset + 53;
-								for (int i = 0; i < 7; i++)
-									score_new = HR_new[score_new + c[i]];
-								score_new = HR_new[score_new]; // partial match
-								score_new = MAX(score_new, score_no_flush);
-								int score_old = eval_789(HR_old, c, 7);
-								if (score_new == score_old)
-									std::cout << "\r\t" << ++n << " / " << N << 
-										" combinations verified";
-								else
-								{
-									std::cout << "\n" << "(" << c[0];
-									for (int i = 1; i < 7; i++)
-										std::cout << ", " << c[i];
-									std::cout << "): old = " << score_old <<
-										", new = " << score_new << "\n";
-									goto fail;
+									int fs6 = HR_new[fs5 + c[6]];
+									int snf6 = HR_new[snf5 + c[6]];
+									for (c[7] = c[6] + 1; c[7] <= 52; c[7]++)
+									{
+										int fs7 = HR_new[fs6 + c[7]];
+										int snf7 = HR_new[snf6 + c[7]];
+										for (c[8] = c[7] + 1; c[8] <= 52; c[8]++)
+										{
+											int fs8 = HR_new[fs7 + c[8]];
+											int snf8 = HR_new[snf7 + c[8]];
+											// 139,177,470 - nf
+											if (fs8 < 130000000)
+											{
+												int score_flush = fs8 + 53;
+												for (int i = 0; i < 9; i++)
+													score_flush = HR_new[score_flush + c[i]];
+												snf8 = MAX(snf8, score_flush);
+											}
+											int score_new = snf8;
+
+											int score_old = 0;
+											for (int np = 0; np < n_pocket_perms; np++)
+												for (int nb = 0; nb < n_board_perms[k]; nb++)
+													score_old = MAX(score_old, 
+														(HR_old[HR_old[HR_old[board_paths[nb] + 
+														c[5 + pocket_perms[np][0]]] + 
+														c[5 + pocket_perms[np][1]]]]));
+
+											n++;
+											if (score_new != score_old)
+											{
+												std::cout << "\n" << "(" << c[0];
+												for (int i = 1; i < 9; i++)
+													std::cout << ", " << c[i];
+												std::cout << "): old = " << score_old <<
+													", new = " << score_new << "\n";
+												goto fail;
+											}
+											else if ((n % 1000LL) == 0)
+											{
+												std::cout << "\r\t" << n << " / " << N[k] << 
+													" combinations verified";
+											}
+										}
+									}
 								}
 							}
-
-	std::cout << "\nChecking all 8-card sorted combinations...\n";
-	N = 752538150LL; // C(52, 8)
-	n = 0;
-	for (c[0] = 1; c[0] <= 52; c[0]++)
-		for (c[1] = c[0] + 1; c[1] <= 52; c[1]++)
-			for (c[2] = c[1] + 1; c[2] <= 52; c[2]++)
-				for (c[3] = c[2] + 1; c[3] <= 52; c[3]++)
-					for (c[4] = c[3] + 1; c[4] <= 52; c[4]++)
-						for (c[5] = c[4] + 1; c[5] <= 52; c[5]++)
-							for (c[6] = c[5] + 1; c[6] <= 52; c[6]++)
-								for (c[7] = c[6] + 1; c[7] <= 52; c[7]++)
-								{
-									int offset = 53;
-									for (int i = 0; i < 8; i++)
-										offset = HR_new[offset + c[i]];
-									offset = HR_new[offset]; // partial match
-									int score_no_flush = 0;
-									if (offset < 120000000)
-									{
-										score_no_flush = HR_new[0] + 53;
-										for (int i = 0; i < 8; i++)
-											score_no_flush = HR_new[score_no_flush + c[i]];
-										score_no_flush = HR_new[score_no_flush]; // partial match
-									}
-									int score_new = offset + 53;
-									for (int i = 0; i < 8; i++)
-										score_new = HR_new[score_new + c[i]];
-									score_new = HR_new[score_new]; // partial match
-									score_new = MAX(score_new, score_no_flush);
-									int score_old = eval_789(HR_old, c, 8);
-									if (score_new == score_old)
-										std::cout << "\r\t" << ++n << " / " << N << 
-											" combinations verified";
-									else
-									{
-										std::cout << "\n" << "(" << c[0];
-										for (int i = 1; i < 8; i++)
-											std::cout << ", " << c[i];
-										std::cout << "): old = " << score_old <<
-											", new = " << score_new << "\n";
-										goto fail;
-									}
-								}
-
-	std::cout << "\nChecking all 9-card sorted combinations...\n";
-	N = 3679075400LL; // C(52, 9)
-	n = 0;
-	for (c[0] = 1; c[0] <= 52; c[0]++)
-		for (c[1] = c[0] + 1; c[1] <= 52; c[1]++)
-			for (c[2] = c[1] + 1; c[2] <= 52; c[2]++)
-				for (c[3] = c[2] + 1; c[3] <= 52; c[3]++)
-					for (c[4] = c[3] + 1; c[4] <= 52; c[4]++)
-						for (c[5] = c[4] + 1; c[5] <= 52; c[5]++)
-							for (c[6] = c[5] + 1; c[6] <= 52; c[6]++)
-								for (c[7] = c[6] + 1; c[7] <= 52; c[7]++)
-									for (c[8] = c[7] + 1; c[8] <= 52; c[8]++)
-									{
-										int offset = 53;
-										for (int i = 0; i < 9; i++)
-											offset = HR_new[offset + c[i]];
-										int score_no_flush = 0;
-										if (offset < 120000000)
-										{
-											score_no_flush = HR_new[0] + 53;
-											for (int i = 0; i < 9; i++)
-												score_no_flush = HR_new[score_no_flush + c[i]];
-										}
-										int score_new = offset + 53;
-										for (int i = 0; i < 9; i++)
-											score_new = HR_new[score_new + c[i]];
-										score_new = MAX(score_new, score_no_flush);
-										int score_old = eval_789(HR_old, c, 9);
-										if (score_new == score_old)
-											std::cout << "\r\t" << ++n << " / " << N << 
-												" combinations verified";
-										else
-										{
-											std::cout << "\n" << "(" << c[0];
-											for (int i = 1; i < 9; i++)
-												std::cout << ", " << c[i];
-											std::cout << "): old = " << score_old <<
-												", new = " << score_new << "\n";
-											goto fail;
-										}
-									}
+						}
+					}
+				}
+			}
+		}
+		std::cout << "\r\t" << n << " / " << N[k] << " combinations verified";
+	}
 
 	std::cout << "\n\nAll combinations verified successfully.\n\n";
 	std::cout << "\nGreat success.\n";
@@ -744,8 +793,9 @@ void test_handranks(const char *filename)
 {
 	int *HR = load_new_handranks(filename);
 
-	int cards[8] = {1, 2, 3, 4, 5, 6, 7, 8},
-		n_cards = 8;
+	//[--, --, '2c', '3c', '4c', '4d', '4h', '5c', '6c']
+	int cards[9] = {0, 0, 1, 5, 9, 10, 11, 13, 17},
+		n_cards = 9;
 
 	int offset = 53;
 	std::cout << "offset: " << offset << "\n";
@@ -754,11 +804,6 @@ void test_handranks(const char *filename)
 		offset = HR[offset + cards[i]];
 		std::cout << "card = " << cards[i] << " --> offset = " << offset << "\n";
 	}
-	if (n_cards < 9)
-	{
-		offset = HR[offset];
-		std::cout << "(partial) --> offset = " << offset << "\n";
-	}
 
 	int rank = offset + 53;
 	for (int i = 0; i < n_cards; i++)
@@ -766,19 +811,14 @@ void test_handranks(const char *filename)
 		rank = HR[rank + cards[i]];
 		std::cout << "\tcard = " << cards[i] << " --> rank = " << rank << "\n";
 	}
-	if (n_cards < 9)
-	{
-		rank = HR[rank];
-		std::cout << "\t(partial) --> rank = " << rank << "\n";
-	}
 	std::cout << "Hand rank: " << rank << "\n";	
 }
 
 void test_flush_suits()
 {
-	//['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '3c']
-	int cards[9] = {4, 8, 12, 16, 20, 24, 28, 32, 52};
-	const char *suits[] = {"n/a", "c", "d", "h", "s"};
+	//[--, --, '2c', '3c', '4c', '4d', '4h', '5c', '6c']
+	int cards[9] = {0, 0, 1, 5, 9, 10, 11, 13, 17};
+	const char *suits[] = {"n_a", "c", "d", "h", "s"};
 
 	std::vector<int64_t> id_fs;
 	std::vector<int> hand_ranks;
@@ -839,11 +879,11 @@ void test_flush_suits()
 
 void test_straight_flush()
 {
-	//['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '3c']
-	int cards[9] = {4, 8, 12, 16, 20, 24, 28, 32, 52};
+	//[--, --, '2c', '3c', '4c', '4d', '4h', '5c', '6c']
+	int cards[9] = {0, 0, 1, 5, 9, 10, 11, 13, 17};
 	int64_t id = 0LL;
 	for (int i = 0; i < 9; i++)
-		id = add_card_to_id_flush_ranks_4(id, cards[i]);
+		id = add_card_to_id_flush_ranks_1(id, cards[i]);
 	int pocket[4], board[5], n_pocket, n_board;
 	unpack64(id, pocket, board, n_pocket, n_board);
 	std::cout << "\tPocket:";
@@ -894,11 +934,16 @@ void test_no_flush()
 
 void test_flush_hand()
 {
-	//['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '3c']
-	int cards[9] = {4, 8, 12, 16, 20, 24, 28, 32, 52};
+	//[--, --, '2c', '3c', '4c', '4d', '4h', '5c', '6c']
+	int cards[9] = {0, 0, 1, 5, 9, 10, 11, 13, 17};
 	int64_t id = 0LL;
+
 	for (int i = 0; i < 9; i++)
-		id = add_card_to_id_flush_ranks_4(id, cards[i]);
+	{
+		std::cout << "\n=== Adding card " << cards[i] <<  " ===\n";
+		id = add_card_to_id_flush_ranks_1(id, cards[i]);
+		std::cout << "\n";
+	}
 	int pocket[4], board[5], n_pocket, n_board;
 	unpack64(id, pocket, board, n_pocket, n_board);
 	std::cout << "\tPocket:";
@@ -912,6 +957,50 @@ void test_flush_hand()
 	std::cout << "id: " << id << "\n";
 }
 
+bool vec9_equal(const std::vector<int> &v1, const std::vector<int> &v2)
+{
+	for (int i = 0; i < 9; i++)
+		if (v1[i] != v2[i])
+			return false;
+	return true;
+}
+
+void prune_flush_ranks(const char *filename)
+{
+	int offset_fr1 = 0;
+	std::vector<int> hand_ranks;
+	std::vector<int>(500e6, 0).swap(hand_ranks);
+	std::vector<int64_t> id_fr1;
+	std::cout << "\n\n>> IDs for flush ranks (suit #1)... \n";	
+	generate_ids(200e6, id_fr1, add_card_to_id_no_flush);
+	// generate_ids(10e6, id_fr1, add_card_to_id_flush_ranks_1);
+
+	std::cout << "\n\nEvaluating flush ranks (suit #1)...\n";
+	std::tr1::unordered_map<int, int> map_fr1;
+	map_fr1.insert(std::tr1::unordered_map<int, int>::value_type(-1, offset_fr1));
+	process_ids(id_fr1, offset_fr1, 0, hand_ranks,
+		add_card_to_id_no_flush, eval_no_flush, map_fr1);
+		// add_card_to_id_flush_ranks_1, eval_flush_ranks, map_fr1);
+	std::cout << "\n";
+
+	std::cout << "\nCreating paths graph...\n";
+	std::vector< std::vector<int> > paths;
+	for (int i = 0; i < id_fr1.size(); i++)
+	{
+		std::cout << "\r" << i + 1 << " / " << id_fr1.size() << "...";
+		int64_t id = id_fr1[i];
+		std::vector<int> v;
+		for (int j = 0; j <= 52; j++)
+			v.push_back(hand_ranks[offset_fr1 + 53 + i * 53 + j]);
+		paths.push_back(v);
+	}
+
+	// std::vector<int>::iterator duplicates = 
+	std::vector< std::vector<int> >::iterator duplicates =
+		std::unique(paths.begin(), paths.end(), vec9_equal);
+	std::cout << "\n" << paths.size() << " --> " << (duplicates - paths.begin()) << "\n";
+}
+
 struct commas_locale : std::numpunct<char> 
 { 
 	char do_thousands_sep() const { return ','; } 
@@ -921,17 +1010,19 @@ struct commas_locale : std::numpunct<char>
 int main()
 {
 	std::vector<int> hand_ranks;
+
 	std::cout.imbue(std::locale(std::locale(), new commas_locale));
 
-	generate_handranks(hand_ranks);
-	save_handranks(hand_ranks, "hr9_cpp.dat");
+	// generate_handranks(hand_ranks);
+	// save_handranks(hand_ranks, "hr9_cpp4.dat");
+	// test_handranks("hr9_cpp4.dat");	
+	test_all_handranks("hr9_cpp4.dat");
 
-	test_all_handranks("hr9_cpp.dat");
+	// prune_flush_ranks("hr9_cpp.dat");
 
 	// test_flush_suits();
 	// test_straight_flush();
 	// test_flush_hand();
 	// test_flush_ranks_1();
 	// test_no_flush();
-	// test_handranks("hr9_cpp.dat");	
 }
