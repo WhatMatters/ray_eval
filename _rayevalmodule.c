@@ -191,8 +191,9 @@ int64_t make_id(int64_t id_in, int new_card)
 	
 	needsuited = n_cards - 2; // for suit to be significant - need to have n-2 of same suit
 	     
+	int rank;
 	if (n_cards > 4)  
-		for (int rank = 1; rank < 14; rank++)
+		for (rank = 1; rank < 14; rank++)
 			if (n_rank[rank] > 4) // >= 4 of a rank => shouldn't do this one
 				return 0; // can't have > 4 of a rank so return an invalid id
 	
@@ -451,7 +452,8 @@ int generate_handranks(const char *filename)
 		}
 	}
 
-	for (int i = 0; i <= 9; i++)
+	int i;
+	for (i = 0; i <= 9; i++)
 		printf("\n%16s: %d", HandRanks[i], handTypeSum[i]);
 	
 	printf("\nTotal hands = %d\n", count);
@@ -698,30 +700,24 @@ int eval_monte_carlo_omaha_9(int N, int *board, int n_board,
 		int *player_cards = cards + n_board;
 		for (k = 0; k < n_players; k++)
 		{
-			int fs = HR9[HR9[HR9[HR9[board_fs + player_cards[0]] + 
-				player_cards[1]] + player_cards[2]] + player_cards[3]];
-			int score = HR9[HR9[HR9[HR9[board_snf + player_cards[0]] + 
-				player_cards[1]] + player_cards[2]] + player_cards[3]];
+			int fs = board_fs;
+			int score = board_snf;
+			for (j = 0; j < 4; j++)
+			{
+				fs = HR9[fs + player_cards[j]];
+				score = HR9[score + player_cards[j]];
+			}
 			if (fs != 0)
 			{
 				HR9_f = HR9 + (4 - fs);
 				int sf = flush_offset;
-				for (int j = 0; j < n_board; j++)
+				for (j = 0; j < n_board; j++)
 					sf = HR9_f[sf + cards[j]];
-				sf = HR9_f[HR9_f[HR9_f[HR9_f[sf + player_cards[0]] + 
-					player_cards[1]] + player_cards[2]] + player_cards[3]];
+				for (j = 0; j < 4; j++)
+					sf = HR9_f[sf + player_cards[j]];
 				score = max(score, sf);
 			}
-			// if (fs < 130000000)
-			// {
-			// 	int sf = fs + 53;
-			// 	for (j = 0; j < n_board; j++)
-			// 		sf = HR9[sf + cards[j]];
-			// 	sf = HR9[HR9[HR9[HR9[sf + player_cards[0]] + 
-			// 		player_cards[1]] + player_cards[2]] + player_cards[3]];
-			// 	score = max(score, sf);
-			// }
-
+			
 			scores[k] = score;
 			if (score > best_score)
 			{
