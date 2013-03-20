@@ -658,9 +658,11 @@ int eval_monte_carlo_omaha_9(int N, int *board, int n_board,
 	int available_cards[52];
 	if (n_board != 3 && n_board != 4 && n_board != 5)
 		return 1;
-	int fs_offset = (n_board == 5) ? 53 : ((n_board == 4) ? HR9[53] : HR9[HR9[53]]);
+	int fs_offset = (n_board == 5) ? 106 : ((n_board == 4) ? HR9[106] : HR9[HR9[106]]);
 	int snf_offset = (n_board == 5) ? (HR9[0] + 53) : 
 		((n_board == 4) ? HR9[HR9[0] + 53] : HR9[HR9[HR9[0] + 53]]);
+	int flush_offset = (n_board == 5) ? (HR9[1] + 56) : 
+		((n_board == 4) ? HR9[HR9[1] + 56] : HR9[HR9[HR9[1] + 56]]);
 	for (i = 0; i < n_board; i++)
 	{
 		if (board[i] == 255)
@@ -679,6 +681,7 @@ int eval_monte_carlo_omaha_9(int N, int *board, int n_board,
 	}
 	n_available = 52 - n_board - 4 * n_players + n_mask;
 	get_cards(deck, available_cards, 1); // convert 0-51 to 1-52
+	int *HR9_f;
 	for (i = 0; i < N; i++)
 	{
 		int sample[52], scores[MAX_PLAYERS], best_score = -1, tied = 0;
@@ -699,15 +702,25 @@ int eval_monte_carlo_omaha_9(int N, int *board, int n_board,
 				player_cards[1]] + player_cards[2]] + player_cards[3]];
 			int score = HR9[HR9[HR9[HR9[board_snf + player_cards[0]] + 
 				player_cards[1]] + player_cards[2]] + player_cards[3]];
-			if (fs < 130000000)
+			if (fs != 0)
 			{
-				int sf = fs + 53;
-				for (j = 0; j < n_board; j++)
-					sf = HR9[sf + cards[j]];
-				sf = HR9[HR9[HR9[HR9[sf + player_cards[0]] + 
+				HR9_f = HR9 + (4 - fs);
+				int sf = flush_offset;
+				for (int j = 0; j < n_board; j++)
+					sf = HR9_f[sf + cards[j]];
+				sf = HR9_f[HR9_f[HR9_f[HR9_f[sf + player_cards[0]] + 
 					player_cards[1]] + player_cards[2]] + player_cards[3]];
 				score = max(score, sf);
 			}
+			// if (fs < 130000000)
+			// {
+			// 	int sf = fs + 53;
+			// 	for (j = 0; j < n_board; j++)
+			// 		sf = HR9[sf + cards[j]];
+			// 	sf = HR9[HR9[HR9[HR9[sf + player_cards[0]] + 
+			// 		player_cards[1]] + player_cards[2]] + player_cards[3]];
+			// 	score = max(score, sf);
+			// }
 
 			scores[k] = score;
 			if (score > best_score)
@@ -952,13 +965,30 @@ static PyObject *_rayeval_eval_hand(PyObject *self, PyObject *args)
 
 	if (is_omaha_9)
 	{
-		value = 53;
+		int fs = 106, snf = HR9[0] + 53, fo = HR9[1] + 56;
+		if (n_board < 5) { fs = HR9[fs]; snf = HR9[snf]; fo = HR9[fo]; }
+		if (n_board < 4) { fs = HR9[fs]; snf = HR9[snf]; fo = HR9[fo]; }
 		for (i = 0; i < n_board; i++)
-			value = HR9[value + board[i] + 1];
+		{
+			fs = HR9[fs + board[i] + 1]; 
+			snf = HR9[snf + board[i] + 1];
+		}
 		for (i = 0; i < n_pocket; i++)
-			value = HR9[value + pocket[i] + 1];
-		if (n_board + n_pocket < 9)
-			value = HR9[value];
+		{
+			fs = HR9[fs + pocket[i] + 1];
+			snf = HR9[snf + pocket[i] + 1];
+		}
+		value = snf;
+		if (fs != 0)
+		{
+			int *HR9_f = HR9 + (4 - fs);
+			int flush_score = fo;
+			for (i = 0; i < n_board; i++)
+				flush_score = HR9[flush_score + board[i] + 1]; 
+			for (i = 0; i < n_pocket; i++)
+				flush_score = HR9[flush_score + pocket[i] + 1];
+			value = (flush_score > value) ? flush_score : value;
+		}
 		return PyInt_FromLong((long)value);
 	}
 	else if (is_omaha)
@@ -973,7 +1003,6 @@ static PyObject *_rayeval_eval_hand(PyObject *self, PyObject *args)
 		value = 0;
 		for (nb = 0; nb < n_board_perms; ++nb)
 			for (np = 0; np < n_pocket_perms; ++np)
-				// Aldanor: don't forget to use extra HR[...] for 5/6-card eval
 				value = max(value, HR[HR[HR[board_paths[nb] + 
 						pocket[pocket_perms[0][np]] + 1] + 
 							pocket[pocket_perms[1][np]] + 1]]);
