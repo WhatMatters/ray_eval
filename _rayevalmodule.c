@@ -984,9 +984,9 @@ static PyObject *_rayeval_eval_hand(PyObject *self, PyObject *args)
 			int *HR9_f = HR9 + (4 - fs);
 			int flush_score = fo;
 			for (i = 0; i < n_board; i++)
-				flush_score = HR9[flush_score + board[i] + 1]; 
+				flush_score = HR9_f[flush_score + board[i] + 1]; 
 			for (i = 0; i < n_pocket; i++)
-				flush_score = HR9[flush_score + pocket[i] + 1];
+				flush_score = HR9_f[flush_score + pocket[i] + 1];
 			value = (flush_score > value) ? flush_score : value;
 		}
 		return PyInt_FromLong((long)value);
