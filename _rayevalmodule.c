@@ -535,6 +535,8 @@ void init_random_int_52(void)
 int random_int_52(int k) 
 {
     int r;
+    if (k == 0)
+    	return 0; // prevent potential segfault
 	do { r = rand() / RAND_MAX_DIV_52[k]; } while (r > k);
     return r; // 0 to k
 }
