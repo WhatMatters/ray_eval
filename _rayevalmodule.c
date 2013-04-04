@@ -463,7 +463,7 @@ int generate_handranks(const char *filename)
 	if (fout)
 	{
 		result = 0;
-		fwrite(_HR, sizeof(_HR), 1, fout);
+        fwrite(_HR, sizeof(int), 32487834, fout);
 		fclose(fout);
 	}
 	free(_HR); free(ids); _HR = 0; ids = 0;
