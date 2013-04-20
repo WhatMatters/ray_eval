@@ -29,12 +29,43 @@ def split_string(x):
     return [] if not x.strip() else [c.strip() for c in x.split(' ')]
 
 
-def load_handranks(filename):
-    _rayeval.load_handranks(filename)
+def load_handranks_7(filename):
+    """
+    Load 7-card handranks
+
+    filename    : 7-card hand ranks file
+    """
+    _rayeval.load_handranks_7(filename)
 
 
 def load_handranks_9(filename):
+    """
+    Load 9-card handranks
+
+    filename    : 9-card hand ranks file
+    """
     _rayeval.load_handranks_9(filename)
+
+
+def generate_handranks_7(filename, test=True):
+    """
+    Generate 7-card handranks
+
+    filename    : 7-card hand ranks file
+    test        : run the verification test
+    """
+    _rayeval.save_handranks_7(filename, test)
+
+
+def generate_handranks_9(filename, filename7='', test=True):
+    """
+    Generate 9-card handranks
+
+    filename    : 9-card hand ranks file
+    filename7   : 7-card hand ranks file
+    test        : run the verification test
+    """
+    _rayeval.generate_handranks_9(filename, filename7)
 
 
 def seed(n):
