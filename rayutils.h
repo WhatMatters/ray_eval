@@ -21,6 +21,8 @@
 #define HEART   			0x2000
 #define SPADE   			0x1000
 
+#include <sys/types.h>
+
 int load_file(char* dest, size_t size, size_t nitems, FILE* stream);
 int cactus_findit(int key);
 int cactus_to_ray(int holdrank);
@@ -31,3 +33,8 @@ void swap(int *x, int *y);
 void random_sample_52_ross(int n, int k, int *out);
 int *smart_load(const char *filename);
 int smart_save(int *x, int size, const char *filename);
+key_t generate_random_shm_key(void);
+int *smart_load_to_shm(const char *filename, key_t key);
+int *attach_hr(key_t key);
+int *attach_shm(key_t key, int size);
+int del_shm(key_t key);

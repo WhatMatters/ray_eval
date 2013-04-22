@@ -68,6 +68,78 @@ def generate_handranks_9(filename, filename7='', test=True):
     _rayeval.generate_handranks_9(filename, filename7, test)
 
 
+def load_handranks_7_to_shm(filename, path=None, id=0):
+    """
+    Load 7-card handranks to IPC shared memory
+        
+    filename    : 7-card hand ranks file
+    path        : ftok path param for generating shm key
+    id          : ftok id param for generating shm key
+    """
+    path = path if path is not None else filename
+    _rayeval.load_handranks_7_to_shm(filename, path, id)
+
+                                  
+def load_handranks_9_to_shm(filename, path=None, id=0):
+    """
+    Load 9-card handranks to IPC shared memory
+
+    filename    : 9-card hand ranks file
+    path        : ftok path param to generate shm key
+    id          : ftok id param to generate shm key
+    """
+    path = path if path is not None else filename
+    _rayeval.load_handranks_9_to_shm(filename, path, id)
+
+
+def attach_handranks_7(path, id=0):
+    """
+    Attach 7-card handranks shared memory segment
+
+    path    : ftok path param to generate shm key
+    id      : ftok id param to generate shm key
+    """
+    _rayeval.attach_handranks_7(path, id)
+
+
+def attach_handranks_9(path, id=0):
+    """
+    Attach 9-card handranks shared memory segment
+                                      
+    path    : ftok path param to generate shm key
+    id      : ftok id param to generate shm key
+    """
+    _rayeval.attach_handranks_9(path, id)
+
+
+def detach_handranks_7():
+    """
+    Detach 7-card handranks shared memory segment
+    """
+    _rayeval.detach_handranks_7()
+                                  
+
+def detach_handranks_9():
+    """
+    Detach 9-card handranks shared memory segment
+    """
+    _rayeval.detach_handranks_9()
+
+
+def del_handranks_shm(path, id=0):
+    """
+    Deletes handranks shared memory segment
+        
+    Note that only the super-user or a process with an effective uid equal 
+    to the shm_perm.cuid or shm_perm.uid values in the data structure 
+    associated with the queue can do this.
+
+    path    : ftok path param to generate shm key
+    id      : ftok id param to generate shm key
+    """
+    _rayeval.del_handranks_shm(path, id)
+
+
 def seed(n):
     """
     Set the random seed for sampling to a specified values.
