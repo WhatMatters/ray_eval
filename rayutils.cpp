@@ -3,6 +3,10 @@
 
 #include <iostream>
 #include <fstream>
+#include <sys/types.h>
+#include <errno.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 #include "rayutils.h"
 #include "arrays.h"
@@ -79,7 +83,7 @@ const char *hand_rank_str(int handrank_num)
         "two pairs",
         "one pair",
         "high card"
-    };    
+    };
     return _hand_rank_str[handrank_num];
 }
 
@@ -159,6 +163,105 @@ int *smart_load(const char *filename)
     else
         return NULL;
 }
+
+key_t generate_random_shm_key(void)
+{
+    /*
+     Referecnce:
+     -----------
+     http://www.c-faq.com/lib/randrange.html
+     
+     NOTICE:
+     -------
+     We don't know what type key_t is, so we follow a
+     conservative approach and generate only keys where
+     0 <= key <= SHRT_MAX.
+     
+     Such values will work if key_t is typedef-ed as a short, int, uint,
+     long or ulong.
+     */
+    int key;
+    do {
+        key = ((int)((double)rand() / ((double)RAND_MAX + 1) * SHRT_MAX)) + 1;
+    } while (key == IPC_PRIVATE);
+    
+    return (key_t)key;
+}
+
+int *smart_load_to_shm(const char *filename, key_t key)
+{
+    int shmid;
+    // the size of the file is contained in the header
+    FILE *f = fopen(filename, "rb");
+    int *shm, *hr;
+    int size = 0;
+    if (f)
+    {
+        fread(&size, sizeof(int), 1, f);
+        shmid = shmget(key, size*sizeof(int) + sizeof(int), IPC_CREAT | 0600);
+        if (shmid == -1)
+        {
+            perror("shmget");
+            return NULL;
+        }
+        
+        if ((shm = (int *)shmat(shmid, NULL, 0)) == (int *) -1)
+        {
+            perror("shmat");
+            return NULL;
+        }
+        *shm = size;
+        hr = shm + 1;
+        load_file((char *)hr, sizeof(int), size, f);
+        fclose(f);
+        return shm;
+    }
+    return NULL;
+}
+
+int *attach_hr(key_t key)
+{
+    int hr_size;
+    hr_size = *attach_shm(key, 1);
+    return attach_shm(key, hr_size + 1) + 1;
+}
+
+int *attach_shm(key_t key, int size)
+{
+    int* shm;
+    int shmid;
+    
+    // locating the segment
+    if ((shmid = shmget(key, size * sizeof(int), 0600)) < 0) {
+        perror("shmget");
+        return NULL;
+    }
+    // attaching the segment
+    if ((shm = (int *)shmat(shmid, NULL, 0)) == (int *) -1) {
+        perror("shmat");
+        return NULL;
+    }
+    return shm;
+}
+
+int del_shm(key_t key)
+{
+    int shmid;
+    int res;
+    // locating the segment
+    if ((shmid = shmget(key, 0, 0600)) < 0) {
+        perror("shmget");
+        return -1;
+    }
+    // deleting the segment
+    if ((res = shmctl(shmid, IPC_RMID, (struct shmid_ds *) NULL)) == -1)
+    {
+        perror("shmctl");
+        return -1;
+    }
+    return res;
+}
+
 
 int smart_save(int *x, int size, const char *filename)
 {

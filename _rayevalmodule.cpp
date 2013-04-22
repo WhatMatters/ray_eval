@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <errno.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
 #include <Python.h>
 
 #include "rayutils.h"
@@ -308,6 +313,34 @@ static PyObject *_rayeval_load_handranks_9(PyObject *self, PyObject *args)
 	Py_RETURN_NONE;
 }
 
+static PyObject *_rayeval_load_handranks_7_to_shm(PyObject *self, PyObject *args)
+{
+    char *filename;
+    char *path;
+    int user_id;
+    if (!PyArg_ParseTuple(args, "ssi", &filename, &path, &user_id))
+        return NULL;
+    if (!HR)
+        if (!(HR = smart_load_to_shm(filename, ftok(path, user_id))))
+            RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to load hand ranks from file.");
+    HR = HR + 1;
+    Py_RETURN_NONE;
+}
+
+static PyObject *_rayeval_load_handranks_9_to_shm(PyObject *self, PyObject *args)
+{
+    char *filename;
+    char *path;
+    int user_id;
+  	if (!PyArg_ParseTuple(args, "ssi", &filename, &path, &user_id))
+    	return NULL;
+    if (!HR9)
+	    if (!(HR9 = smart_load_to_shm(filename, ftok(path, user_id))))
+	    	RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to load hand ranks [9] from file.");
+    HR9 = HR9 + 1;
+    Py_RETURN_NONE;
+}
+
 static PyObject *_rayeval_generate_handranks_7(PyObject *self, PyObject *args)
 {
 	char *filename;
@@ -315,7 +348,7 @@ static PyObject *_rayeval_generate_handranks_7(PyObject *self, PyObject *args)
   	if (!PyArg_ParseTuple(args, "si", &filename, &test))
     	return NULL;
 	if (raygen7(filename, (test != 0)))
-		RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to generate hand ranks file.");
+		RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to generate hand ranks [7] file.");
 	Py_RETURN_NONE;
 }
 
@@ -326,7 +359,63 @@ static PyObject *_rayeval_generate_handranks_9(PyObject *self, PyObject *args)
   	if (!PyArg_ParseTuple(args, "ssi", &filename, &filename7, &test))
     	return NULL;
 	if (raygen9(filename, filename7, (test != 0)))
-		RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to generate hand ranks file.");
+		RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to generate hand ranks [9] file.");
+	Py_RETURN_NONE;
+}
+
+
+static PyObject *_rayeval_attach_handranks_7(PyObject *self, PyObject *args)
+{
+    char *path;
+    int user_id;
+  	if (!PyArg_ParseTuple(args, "si", &path, &user_id))
+    	return NULL;
+    if (!HR)
+        if (!(HR = attach_hr(ftok(path, user_id))))
+            RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to load hand ranks [7] from shared memory.");
+	Py_RETURN_NONE;
+}
+
+static PyObject *_rayeval_attach_handranks_9(PyObject *self, PyObject *args)
+{
+    char *path;
+    int user_id;
+  	if (!PyArg_ParseTuple(args, "si", &path, &user_id))
+        return NULL;
+    if (!HR9)
+        if (!(HR9 = attach_hr(ftok(path, user_id))))
+            RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to load hand ranks [9] from shared memory.");
+	Py_RETURN_NONE;
+}
+
+static PyObject *_rayeval_detach_handranks_7(PyObject *self, PyObject *args)
+{
+    if (shmdt(HR - 1) == -1)
+    {
+        perror("shmdt");
+        RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to detach hand ranks [7] from shared memory.");
+    }
+	Py_RETURN_NONE;
+}
+
+static PyObject *_rayeval_detach_handranks_9(PyObject *self, PyObject *args)
+{
+    if (shmdt(HR9 - 1) == -1)
+    {
+        perror("shmdt");
+        RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to detach hand ranks [9] from shared memory.");
+    }
+	Py_RETURN_NONE;
+}
+
+static PyObject *_rayeval_del_handranks_shm(PyObject *self, PyObject *args)
+{
+    char *path;
+    int user_id;
+  	if (!PyArg_ParseTuple(args, "si", &path, &user_id))
+        return NULL;
+    if (del_shm(ftok(path, user_id)) == -1)
+        RAISE_EXCEPTION(PyExc_RuntimeError, "Failed to detach hand ranks from shared memory.");
 	Py_RETURN_NONE;
 }
 
@@ -531,7 +620,14 @@ static PyMethodDef _rayeval_methods[] = {
 	{"generate_handranks_7", (PyCFunction) _rayeval_generate_handranks_7, METH_VARARGS, ""},
 	{"generate_handranks_9", (PyCFunction) _rayeval_generate_handranks_9, METH_VARARGS, ""},
 	{"load_handranks_7", (PyCFunction) _rayeval_load_handranks_7, METH_VARARGS, ""},
+    {"load_handranks_7_to_shm", (PyCFunction) _rayeval_load_handranks_7_to_shm, METH_VARARGS, ""},
 	{"load_handranks_9", (PyCFunction) _rayeval_load_handranks_9, METH_VARARGS, ""},
+    {"load_handranks_9_to_shm", (PyCFunction) _rayeval_load_handranks_9_to_shm, METH_VARARGS, ""},
+    {"attach_handranks_7", (PyCFunction) _rayeval_attach_handranks_7, METH_VARARGS, ""},
+    {"attach_handranks_9", (PyCFunction) _rayeval_attach_handranks_9, METH_VARARGS, ""},
+    {"detach_handranks_7", (PyCFunction) _rayeval_detach_handranks_7, METH_VARARGS, ""},
+    {"detach_handranks_9", (PyCFunction) _rayeval_detach_handranks_9, METH_VARARGS, ""},
+    {"del_handranks_shm", (PyCFunction) _rayeval_del_handranks_shm, METH_VARARGS, ""},
 	{"eval_mc", (PyCFunction) _rayeval_eval_mc, METH_VARARGS, ""},
 	{"eval_hand", (PyCFunction) _rayeval_eval_hand, METH_VARARGS, ""},
 	{"test", (PyCFunction) _rayeval_test, METH_NOARGS, ""},
