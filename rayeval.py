@@ -54,7 +54,7 @@ def generate_handranks_7(filename, test=True):
     filename    : 7-card hand ranks file
     test        : run the verification test
     """
-    _rayeval.save_handranks_7(filename, test)
+    _rayeval.generate_handranks_7(filename, test)
 
 
 def generate_handranks_9(filename, filename7='', test=True):
