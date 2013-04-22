@@ -65,7 +65,7 @@ def generate_handranks_9(filename, filename7='', test=True):
     filename7   : 7-card hand ranks file
     test        : run the verification test
     """
-    _rayeval.generate_handranks_9(filename, filename7)
+    _rayeval.generate_handranks_9(filename, filename7, test)
 
 
 def seed(n):
