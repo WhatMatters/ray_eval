@@ -140,6 +140,15 @@ def del_handranks_shm(path, id=0):
     _rayeval.del_handranks_shm(path, id)
 
 
+def is_loaded_to_shm(path, id=0):
+    """
+    Returns True if hand rank file loaded to shm and False otherwise or on error
+        
+    path    : ftok path param to generate shm key
+    id      : ftok id param to generate shm key
+    """
+    return _rayeval.is_loaded_to_shm(path, id)
+
 def seed(n):
     """
     Set the random seed for sampling to a specified values.

@@ -419,6 +419,17 @@ static PyObject *_rayeval_del_handranks_shm(PyObject *self, PyObject *args)
 	Py_RETURN_NONE;
 }
 
+static PyObject *_rayeval_is_loaded_to_shm(PyObject *self, PyObject *args)
+{
+    char *path;
+    int user_id;
+    if (!PyArg_ParseTuple(args, "si", &path, &user_id))
+        return NULL;
+    if (shmget(ftok(path, user_id), 1, 0600) < 0)
+        Py_RETURN_FALSE;
+    Py_RETURN_TRUE;
+}
+
 int *parse_board_and_pockets(char *game, PyObject *py_board, PyObject *py_pocket,
 	int *board, int *pocket, int *n_board, int *n_pocket, int *n_players, int *is_omaha,
 	int *is_omaha_9)
@@ -628,6 +639,7 @@ static PyMethodDef _rayeval_methods[] = {
     {"detach_handranks_7", (PyCFunction) _rayeval_detach_handranks_7, METH_VARARGS, ""},
     {"detach_handranks_9", (PyCFunction) _rayeval_detach_handranks_9, METH_VARARGS, ""},
     {"del_handranks_shm", (PyCFunction) _rayeval_del_handranks_shm, METH_VARARGS, ""},
+    {"is_loaded_to_shm", (PyCFunction) _rayeval_is_loaded_to_shm, METH_VARARGS, ""},
 	{"eval_mc", (PyCFunction) _rayeval_eval_mc, METH_VARARGS, ""},
 	{"eval_hand", (PyCFunction) _rayeval_eval_hand, METH_VARARGS, ""},
 	{"test", (PyCFunction) _rayeval_test, METH_NOARGS, ""},
