@@ -1,34 +1,16 @@
-# Compiled Object files
 *.slo
 *.lo
 *.o
-
-# Compiled Dynamic libraries
+*.pyc
 *.so
 *.dylib
-
-# Compiled Static libraries
 *.lai
 *.la
 *.a
-
 *.out
 *.dat
 *.trace
 *.dtrace
 *.plist
-
 rayeval.egg-info
-
-*.pyc
-<<<<<<< HEAD
-rayw9card4.cpp
-
-mctest.py
-
-profile_mc.c
 temp/
-backup.c
-=======
-temp/
->>>>>>> .gitignore
