@@ -99,7 +99,7 @@ int eval_monte_carlo_holdem(int N, int *board, int n_board,
 	return 0;
 }
 
-int eval_monte_carlo_omaha_9(int N, int *board, int n_board, 
+int eval_monte_carlo_omaha(int N, int *board, int n_board, 
 	int *pocket, int n_players, double *ev)
 {
 	int mask[52], cards[52], n_cards = 0, n_mask = 0, n_available, i, j, k;
@@ -195,7 +195,8 @@ static int board_perms[10][3] = {
 	{0, 1, 3}, {0, 2, 3}, {1, 2, 3}, // 4, 5
 	{0, 1, 4}, {0, 2, 4}, {0, 3, 4}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}; // 5
 
-int eval_monte_carlo_omaha(int N, int *board, int n_board, 
+// naive old method, left here for reference
+int eval_monte_carlo_omaha_old(int N, int *board, int n_board, 
 	int *pocket, int n_players, double *ev)
 {
 	int n_board_perms = n_board == 5 ? 10 : n_board == 4 ? 4 : n_board == 3 ? 1 : -1;
@@ -431,21 +432,14 @@ static PyObject *_rayeval_is_loaded_to_shm(PyObject *self, PyObject *args)
 }
 
 int *parse_board_and_pockets(char *game, PyObject *py_board, PyObject *py_pocket,
-	int *board, int *pocket, int *n_board, int *n_pocket, int *n_players, int *is_omaha,
-	int *is_omaha_9)
+	int *board, int *pocket, int *n_board, int *n_pocket, int *n_players, int *is_omaha)
 {
 	int i, pocket_size = 2;
 	static int ok = 1;
 	*is_omaha = 0;
-	*is_omaha_9 = 0;
 
 	if (!strcmp(game, "omaha"))
 		*is_omaha = 1;
-	else if (!strcmp(game, "omaha_9"))
-	{
-		*is_omaha = 1;
-		*is_omaha_9 = 1;
-	}
 	else if (strcmp(game, "holdem"))
     	RAISE_EXCEPTION(PyExc_ValueError, "Game type must be holdem or omaha.");
     pocket_size += 2 * (*is_omaha);
@@ -490,20 +484,22 @@ int *parse_board_and_pockets(char *game, PyObject *py_board, PyObject *py_pocket
 
 static PyObject *_rayeval_eval_hand(PyObject *self, PyObject *args)
 {
-	if (!HR)
-		RAISE_EXCEPTION(PyExc_RuntimeError, "Please call load_handranks() first.");	
-
 	char *game;
 	PyObject *py_board, *py_pocket;
 	int n_board, n_pocket, i, value;
-	int n_players, board[5], pocket[4 * MAX_PLAYERS], is_omaha, is_omaha_9;
+	int n_players, board[5], pocket[4 * MAX_PLAYERS], is_omaha;
 
 	if (!PyArg_ParseTuple(args, "sOO", &game, &py_board, &py_pocket))
 		return NULL;
 
 	if (!parse_board_and_pockets(game, py_board, py_pocket, board, pocket, 
-		&n_board, &n_pocket, &n_players, &is_omaha, &is_omaha_9))
+		&n_board, &n_pocket, &n_players, &is_omaha))
 		return NULL;
+
+	if (!is_omaha && !HR)
+		RAISE_EXCEPTION(PyExc_RuntimeError, "Please load 7-card hand ranks first.");
+	if (is_omaha && !HR9)
+		RAISE_EXCEPTION(PyExc_RuntimeError, "Please load 9-card hand ranks first.");
 
 	if (n_players > 1)
 		RAISE_EXCEPTION(PyExc_ValueError, "One player expected, found more.");
@@ -515,7 +511,7 @@ static PyObject *_rayeval_eval_hand(PyObject *self, PyObject *args)
 		if (pocket[i] == 255)
 			RAISE_EXCEPTION(PyExc_ValueError, "Masked pocket is not allowed.");
 
-	if (is_omaha_9)
+	if (is_omaha)
 	{
 		int fs = 106, snf = HR9[0] + 53, fo = HR9[1] + 56;
 		if (n_board < 5) { fs = HR9[fs]; snf = HR9[snf]; fo = HR9[fo]; }
@@ -543,23 +539,6 @@ static PyObject *_rayeval_eval_hand(PyObject *self, PyObject *args)
 		}
 		return PyInt_FromLong((long)value);
 	}
-	else if (is_omaha)
-	{
-		int n_board_perms = n_board == 5 ? 10 : n_board == 4 ? 4 : n_board == 3 ? 1 : -1;
-		int board_paths[10], nb, np;
-		for (nb = 0; nb < n_board_perms; nb++)
-			board_paths[nb] = HR[HR[HR[53 + 
-				board[board_perms[nb][0]] + 1] + 
-					board[board_perms[nb][1]] + 1] + 
-						board[board_perms[nb][2]] + 1];
-		value = 0;
-		for (nb = 0; nb < n_board_perms; ++nb)
-			for (np = 0; np < n_pocket_perms; ++np)
-				value = MAX(value, HR[HR[HR[board_paths[nb] + 
-						pocket[pocket_perms[0][np]] + 1] + 
-							pocket[pocket_perms[1][np]] + 1]]);
-		return PyInt_FromLong((long)value);
-	}
 	else
 	{
 		value = 53;
@@ -584,13 +563,10 @@ OUTPUT:
 */
 static PyObject *_rayeval_eval_mc(PyObject *self, PyObject *args)
 {
-	if (!HR)
-		RAISE_EXCEPTION(PyExc_RuntimeError, "Please call load_handranks() first.");
-
 	char *game;
 	PyObject *py_board, *py_pocket, *py_ev;
 	int i, n_board, n_pocket;
-	int iterations, n_players, board[5], pocket[4 * MAX_PLAYERS], is_omaha, is_omaha_9;
+	int iterations, n_players, board[5], pocket[4 * MAX_PLAYERS], is_omaha;
 	double ev[MAX_PLAYERS];
 
 	if (!PyArg_ParseTuple(args, "sOOi", &game, &py_board, &py_pocket, &iterations))
@@ -600,12 +576,15 @@ static PyObject *_rayeval_eval_mc(PyObject *self, PyObject *args)
     	RAISE_EXCEPTION(PyExc_ValueError, "Iterations must be a positive integer.");
 
 	if (!parse_board_and_pockets(game, py_board, py_pocket, board, pocket, 
-		&n_board, &n_pocket, &n_players, &is_omaha, &is_omaha_9))
+		&n_board, &n_pocket, &n_players, &is_omaha))
 		return NULL;
 
-	if (is_omaha_9)
-   		eval_monte_carlo_omaha_9(iterations, board, n_board, pocket, n_players, ev);
-   	else if (is_omaha)
+	if (!is_omaha && !HR)
+		RAISE_EXCEPTION(PyExc_RuntimeError, "Please load 7-card hand ranks first.");
+	if (is_omaha && !HR9)
+		RAISE_EXCEPTION(PyExc_RuntimeError, "Please load 9-card hand ranks first.");
+
+	if (is_omaha)
    		eval_monte_carlo_omaha(iterations, board, n_board, pocket, n_players, ev);
    	else
    		eval_monte_carlo_holdem(iterations, board, n_board, pocket, n_players, ev);

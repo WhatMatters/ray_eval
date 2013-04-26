@@ -16,17 +16,9 @@ if __name__ == '__main__':
     n_jobs = 1
 
     t0 = time.time()
-    ev = rayeval.eval_mc(game, board, pocket, iterations, n_jobs)
+    ev = rayeval.eval_mc('omaha', board, pocket, iterations, n_jobs)
     elapsed = time.time() - t0
-    print '[%s]' % 'naive omaha', pocket[:1], 'vs', pocket[1:], (
-        ': EV = %.4f%% (%.2gM iterations).' % (100. * ev[0], iterations / 1e6))
-    print 'Elapsed: %.2f seconds (%.2fM iterations / sec).\n' % (
-        elapsed, iterations / elapsed / 1e6)
-
-    t0 = time.time()
-    ev = rayeval.eval_mc('omaha_9', board, pocket, iterations, n_jobs)
-    elapsed = time.time() - t0
-    print '[%s]' % 'omaha_9', pocket[:1], 'vs', pocket[1:], (
+    print '[%s]' % 'omaha', pocket[:1], 'vs', pocket[1:], (
         ': EV = %.4f%% (%.2gM iterations).' % (100. * ev[0], iterations / 1e6))
     print 'Elapsed: %.2f seconds (%.2fM iterations / sec).\n' % (
         elapsed, iterations / elapsed / 1e6)
