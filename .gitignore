@@ -21,6 +21,7 @@
 rayeval.egg-info
 
 *.pyc
+<<<<<<< HEAD
 rayw9card4.cpp
 
 mctest.py
@@ -28,3 +29,6 @@ mctest.py
 profile_mc.c
 temp/
 backup.c
+=======
+temp/
+>>>>>>> .gitignore
