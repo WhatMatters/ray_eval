@@ -11,6 +11,7 @@ e.g. in Mac OS X run the following prior to using shm functionality:
 import _rayeval
 import itertools
 import joblib
+import pkg_resources
 
 __card_list = list(''.join(c) for c in itertools.product(
     '23456789TJQKA', 'cdhs'))
@@ -37,21 +38,37 @@ def split_string(x):
     return [] if not x.strip() else [c.strip() for c in x.split(' ')]
 
 
-def load_handranks_7(filename):
+def get_handranks_7_filename():
+    """
+    Returns 7-card handranks filename (with path) generated from the setup.py
+    """
+    return pkg_resources.resource_string(__name__, '__rayeval_ranks_path__.txt').split('\n')[0]
+
+
+def get_handranks_9_filename():
+    """
+    Returns 9-card handranks filename (with path) generated from the setup.py
+    """
+    return pkg_resources.resource_string(__name__, '__rayeval_ranks_path__.txt').split('\n')[1]
+
+
+def load_handranks_7(filename=None):
     """
     Load 7-card handranks from file into process memory
 
     filename    : 7-card hand ranks file
     """
+    filename = get_handranks_7_filename() if filename is None else filename
     _rayeval.load_handranks_7(filename)
 
 
-def load_handranks_9(filename):
+def load_handranks_9(filename=None):
     """
     Load 9-card handranks from file into process memory
 
     filename    : 9-card hand ranks file
     """
+    filename = get_handranks_7_filename() if filename is None else filename
     _rayeval.load_handranks_9(filename)
 
 
@@ -76,7 +93,7 @@ def generate_handranks_9(filename, filename7='', test=True):
     _rayeval.generate_handranks_9(filename, filename7, test)
 
 
-def load_handranks_7_to_shm(filename, path=None, id=0):
+def load_handranks_7_to_shm(filename=None, path=None, id=0):
     """
     Load 7-card handranks from file to IPC shared memory
 
@@ -84,11 +101,12 @@ def load_handranks_7_to_shm(filename, path=None, id=0):
     path        : ftok path param for generating shm key
     id          : ftok id param for generating shm key
     """
+    filename = get_handranks_7_filename() if filename is None else filename
     path = path if path is not None else filename
     _rayeval.load_handranks_7_to_shm(filename, path, id)
 
 
-def load_handranks_9_to_shm(filename, path=None, id=0):
+def load_handranks_9_to_shm(filename=None, path=None, id=0):
     """
     Load 9-card handranks from file to IPC shared memory
 
@@ -96,6 +114,7 @@ def load_handranks_9_to_shm(filename, path=None, id=0):
     path        : ftok path param to generate shm key
     id          : ftok id param to generate shm key
     """
+    filename = get_handranks_7_filename() if filename is None else filename
     path = path if path is not None else filename
     _rayeval.load_handranks_9_to_shm(filename, path, id)
 
@@ -134,6 +153,36 @@ def detach_handranks_9():
     _rayeval.detach_handranks_9()
 
 
+def del_handranks_shm_7(path=None, id=0):
+    """
+    Deletes 7-card handranks shared memory segment
+
+    Note that only the super-user or a process with an effective uid equal
+    to the shm_perm.cuid or shm_perm.uid values in the data structure
+    associated with the queue can do this.
+
+    path    : ftok path param to generate shm key
+    id      : ftok id param to generate shm key
+    """
+    path = get_handranks_7_filename() if path is None else path
+    _rayeval.del_handranks_shm(path, id)
+
+
+def del_handranks_shm_9(path=None, id=0):
+    """
+    Deletes 9-card handranks shared memory segment
+
+    Note that only the super-user or a process with an effective uid equal
+    to the shm_perm.cuid or shm_perm.uid values in the data structure
+    associated with the queue can do this.
+
+    path    : ftok path param to generate shm key
+    id      : ftok id param to generate shm key
+    """
+    path = get_handranks_9_filename() if path is None else path
+    _rayeval.del_handranks_shm(path, id)
+
+
 def del_handranks_shm(path, id=0):
     """
     Deletes handranks shared memory segment
@@ -146,6 +195,28 @@ def del_handranks_shm(path, id=0):
     id      : ftok id param to generate shm key
     """
     _rayeval.del_handranks_shm(path, id)
+
+
+def is_loaded_to_shm_7(path=None, id=0):
+    """
+    Returns True if 7-card hand rank file loaded to shm and False otherwise or on error
+
+    path    : ftok path param to generate shm key
+    id      : ftok id param to generate shm key
+    """
+    path = get_handranks_7_filename() if path is None else path
+    return _rayeval.is_loaded_to_shm(path, id)
+
+
+def is_loaded_to_shm_9(path=None, id=0):
+    """
+    Returns True if 9-card hand rank file loaded to shm and False otherwise or on error
+
+    path    : ftok path param to generate shm key
+    id      : ftok id param to generate shm key
+    """
+    path = get_handranks_9_filename() if path is None else path
+    return _rayeval.is_loaded_to_shm(path, id)
 
 
 def is_loaded_to_shm(path, id=0):

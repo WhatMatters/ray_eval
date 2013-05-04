@@ -14,3 +14,4 @@
 *.plist
 rayeval.egg-info
 temp/
+rayeval/__rayeval_ranks_path__.txt
