@@ -63,14 +63,14 @@ Note that max shared memory segment set in bytes and must be divisible by the si
 
 Mac OS X
 --------
-For example in Mac OS X you can update your shm settings (reboot in not required):
+For example in Mac OS X you can update your shm settings (reboot is not required):
 
 	sudo sysctl -w kern.sysv.shmmax=1598029824
 	sudo sysctl -w kern.sysv.shmall=700000
 
 Linux
 -----
-For example in Mac OS X you can update your shm settings (reboot in not required):
+For example in Mac OS X you can update your shm settings (reboot is not required):
 
 	sudo sysctl -w kernel.shmmax=2147483648
 	sudo sysctl -w kernel.shmall=700000
