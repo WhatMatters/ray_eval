@@ -74,3 +74,8 @@ For example in Mac OS X you can update your shm settings (reboot in not required
 
 	sudo sysctl -w kernel.shmmax=2147483648
 	sudo sysctl -w kernel.shmall=700000
+
+License
+=======
+Rayeval is Copyright © 2013 Whatmatters. It is free software, and may be redistributed under the terms specified in the
+GNU GENERAL PUBLIC LICENSE Version 2 or higher (see LICENSE.txt file).
