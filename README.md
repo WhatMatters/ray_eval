@@ -49,3 +49,28 @@ or
 --use-ranks-7=/path/to/rayeval_hand_ranks_7.dat links already generated 7-card hand ranks file to the package
 
 --use-ranks-9=/path/to/rayeval_hand_ranks_7.dat links already generated 9-card hand ranks file to the package
+
+Shared memory
+=============
+
+Hand ranks files can be loaded to the shared memory (http://fscked.org/writings/SHM/shm-5.html).
+
+But shared memory routines will only work if your OS is properly configured. In most operating systems default shared memory settings allows to use just few pages per segment.
+
+In different OS there are different ways to change shared memory  settings. For example in Mac OS X you can find them in /etc/sysctl.conf and update them (without reboot) via sysctl command.
+
+Note that max shared memory segment set in bytes and must be divisible by the size of the page. Total size of the shared memory segments system wide set in pages.
+
+Mac OS X
+--------
+For example in Mac OS X you can update your shm settings (reboot in not required):
+
+	sudo sysctl -w kern.sysv.shmmax=1598029824
+	sudo sysctl -w kern.sysv.shmall=700000
+
+Linux
+-----
+For example in Mac OS X you can update your shm settings (reboot in not required):
+
+	sudo sysctl -w kernel.shmmax=2147483648
+	sudo sysctl -w kernel.shmall=700000
