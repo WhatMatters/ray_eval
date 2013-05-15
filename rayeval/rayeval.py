@@ -93,52 +93,52 @@ def generate_handranks_9(filename, filename7='', test=True):
     _rayeval.generate_handranks_9(filename, filename7, test)
 
 
-def load_handranks_7_to_shm(filename=None, path=None, id=0):
+def load_handranks_7_to_shm(filename=None, path=None, ftok_id=0):
     """
     Load 7-card handranks from file to IPC shared memory
 
     filename    : 7-card hand ranks file
     path        : ftok path param for generating shm key
-    id          : ftok id param for generating shm key
+    ftok_id     : ftok id param for generating shm key
     """
     filename = get_handranks_7_filename() if filename is None else filename
     path = path if path is not None else filename
-    _rayeval.load_handranks_7_to_shm(filename, path, id)
+    _rayeval.load_handranks_7_to_shm(filename, path, ftok_id)
 
 
-def load_handranks_9_to_shm(filename=None, path=None, id=0):
+def load_handranks_9_to_shm(filename=None, path=None, ftok_id=0):
     """
     Load 9-card handranks from file to IPC shared memory
 
     filename    : 9-card hand ranks file
     path        : ftok path param to generate shm key
-    id          : ftok id param to generate shm key
+    ftok_id     : ftok id param to generate shm key
     """
     filename = get_handranks_9_filename() if filename is None else filename
     path = path if path is not None else filename
-    _rayeval.load_handranks_9_to_shm(filename, path, id)
+    _rayeval.load_handranks_9_to_shm(filename, path, ftok_id)
 
 
-def attach_handranks_7(path=None, id=0):
+def attach_handranks_7(path=None, ftok_id=0):
     """
     Attach 7-card handranks shared memory segment
 
     path    : ftok path param to generate shm key
-    id      : ftok id param to generate shm key
+    ftok_id : ftok id param to generate shm key
     """
     path = get_handranks_7_filename() if path is None else path
-    _rayeval.attach_handranks_7(path, id)
+    _rayeval.attach_handranks_7(path, ftok_id)
 
 
-def attach_handranks_9(path=None, id=0):
+def attach_handranks_9(path=None, ftok_id=0):
     """
     Attach 9-card handranks shared memory segment
 
     path    : ftok path param to generate shm key
-    id      : ftok id param to generate shm key
+    ftok_id : ftok id param to generate shm key
     """
     path = get_handranks_9_filename() if path is None else path
-    _rayeval.attach_handranks_9(path, id)
+    _rayeval.attach_handranks_9(path, ftok_id)
 
 
 def detach_handranks_7():
@@ -155,7 +155,7 @@ def detach_handranks_9():
     _rayeval.detach_handranks_9()
 
 
-def del_handranks_shm_7(path=None, id=0):
+def del_handranks_shm_7(path=None, ftok_id=0):
     """
     Deletes 7-card handranks shared memory segment
 
@@ -164,13 +164,13 @@ def del_handranks_shm_7(path=None, id=0):
     associated with the queue can do this.
 
     path    : ftok path param to generate shm key
-    id      : ftok id param to generate shm key
+    ftok_id : ftok id param to generate shm key
     """
     path = get_handranks_7_filename() if path is None else path
-    _rayeval.del_handranks_shm(path, id)
+    _rayeval.del_handranks_shm(path, ftok_id)
 
 
-def del_handranks_shm_9(path=None, id=0):
+def del_handranks_shm_9(path=None, ftok_id=0):
     """
     Deletes 9-card handranks shared memory segment
 
@@ -179,13 +179,13 @@ def del_handranks_shm_9(path=None, id=0):
     associated with the queue can do this.
 
     path    : ftok path param to generate shm key
-    id      : ftok id param to generate shm key
+    ftok_id : ftok id param to generate shm key
     """
     path = get_handranks_9_filename() if path is None else path
-    _rayeval.del_handranks_shm(path, id)
+    _rayeval.del_handranks_shm(path, ftok_id)
 
 
-def del_handranks_shm(path, id=0):
+def del_handranks_shm(path, ftok_id=0):
     """
     Deletes handranks shared memory segment
 
@@ -194,41 +194,41 @@ def del_handranks_shm(path, id=0):
     associated with the queue can do this.
 
     path    : ftok path param to generate shm key
-    id      : ftok id param to generate shm key
+    ftok_id : ftok id param to generate shm key
     """
-    _rayeval.del_handranks_shm(path, id)
+    _rayeval.del_handranks_shm(path, ftok_id)
 
 
-def is_loaded_to_shm_7(path=None, id=0):
+def is_loaded_to_shm_7(path=None, ftok_id=0):
     """
     Returns True if 7-card hand rank file loaded to shm and False otherwise or on error
 
     path    : ftok path param to generate shm key
-    id      : ftok id param to generate shm key
+    ftok_id : ftok id param to generate shm key
     """
     path = get_handranks_7_filename() if path is None else path
-    return _rayeval.is_loaded_to_shm(path, id)
+    return _rayeval.is_loaded_to_shm(path, ftok_id)
 
 
-def is_loaded_to_shm_9(path=None, id=0):
+def is_loaded_to_shm_9(path=None, ftok_id=0):
     """
     Returns True if 9-card hand rank file loaded to shm and False otherwise or on error
 
     path    : ftok path param to generate shm key
-    id      : ftok id param to generate shm key
+    ftok_id : ftok id param to generate shm key
     """
     path = get_handranks_9_filename() if path is None else path
-    return _rayeval.is_loaded_to_shm(path, id)
+    return _rayeval.is_loaded_to_shm(path, ftok_id)
 
 
-def is_loaded_to_shm(path, id=0):
+def is_loaded_to_shm(path, ftok_id=0):
     """
     Returns True if hand rank file loaded to shm and False otherwise or on error
 
     path    : ftok path param to generate shm key
-    id      : ftok id param to generate shm key
+    ftok_id : ftok id param to generate shm key
     """
-    return _rayeval.is_loaded_to_shm(path, id)
+    return _rayeval.is_loaded_to_shm(path, ftok_id)
 
 
 def seed(n):
