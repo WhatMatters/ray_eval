@@ -68,7 +68,7 @@ def load_handranks_9(filename=None):
 
     filename    : 9-card hand ranks file
     """
-    filename = get_handranks_7_filename() if filename is None else filename
+    filename = get_handranks_9_filename() if filename is None else filename
     _rayeval.load_handranks_9(filename)
 
 
@@ -114,7 +114,7 @@ def load_handranks_9_to_shm(filename=None, path=None, id=0):
     path        : ftok path param to generate shm key
     id          : ftok id param to generate shm key
     """
-    filename = get_handranks_7_filename() if filename is None else filename
+    filename = get_handranks_9_filename() if filename is None else filename
     path = path if path is not None else filename
     _rayeval.load_handranks_9_to_shm(filename, path, id)
 
