@@ -119,23 +119,25 @@ def load_handranks_9_to_shm(filename=None, path=None, id=0):
     _rayeval.load_handranks_9_to_shm(filename, path, id)
 
 
-def attach_handranks_7(path, id=0):
+def attach_handranks_7(path=None, id=0):
     """
     Attach 7-card handranks shared memory segment
 
     path    : ftok path param to generate shm key
     id      : ftok id param to generate shm key
     """
+    path = get_handranks_7_filename() if path is None else path
     _rayeval.attach_handranks_7(path, id)
 
 
-def attach_handranks_9(path, id=0):
+def attach_handranks_9(path=None, id=0):
     """
     Attach 9-card handranks shared memory segment
 
     path    : ftok path param to generate shm key
     id      : ftok id param to generate shm key
     """
+    path = get_handranks_9_filename() if path is None else path
     _rayeval.attach_handranks_9(path, id)
 
 
