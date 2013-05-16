@@ -98,6 +98,9 @@ class install_hand_ranks(install_data):
                     INSTALL_DATA_FILES_PATH = ARGV_OPTIONS['ranks_dir']
                 else:
                     INSTALL_DATA_FILES_PATH = file_join(self.install_dir, item[0])
+
+                if not os.path.exists(INSTALL_DATA_FILES_PATH):
+                    os.mkdir(INSTALL_DATA_FILES_PATH)
             else:
                 filtered_data_files.append(item)
 
