@@ -72,7 +72,7 @@ Linux
 -----
 For example in Mac OS X you can update your shm settings (reboot is not required):
 
-	sudo sysctl -w kernel.shmmax=2147483648
+	sudo sysctl -w kernel.shmmax=1598029824
 	sudo sysctl -w kernel.shmall=700000
 
 License
