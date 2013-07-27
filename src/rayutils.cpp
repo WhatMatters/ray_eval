@@ -9,6 +9,7 @@
 #include <sys/shm.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "rayutils.h"
 #include "arrays.h"
