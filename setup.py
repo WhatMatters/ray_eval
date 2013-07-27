@@ -140,16 +140,14 @@ setup(name='rayeval',
                         '-fPIC',
                         '-g',
                         '-Wshorten-64-to-32',
-                        '-gdwarf-2',
-                        '-Qunused-arguments'],
+                        '-gdwarf-2'],
                     extra_link_args=[
                         '-O3',
                         '-msse4',
                         '-fPIC',
                         '-g',
                         '-Wshorten-64-to-32',
-                        '-gdwarf-2',
-                        '-Qunused-arguments'])
+                        '-gdwarf-2'])
       ],
       keywords='poker monte-carlo eval omaha holdem',
       license='LICENSE.txt'
