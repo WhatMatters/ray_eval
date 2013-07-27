@@ -8,6 +8,7 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "rayutils.h"
 #include "arrays.h"
