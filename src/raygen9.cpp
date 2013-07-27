@@ -75,6 +75,7 @@ HOW TO USE THE DATA FILE TO EVALUATE 7-, 8- AND 9-CARD OMAHA HANDS
 #include <string>
 #include <tr1/unordered_map>
 #include <exception>
+#include <string.h>
 
 #include "rayutils.h"
 #include "arrays.h"
