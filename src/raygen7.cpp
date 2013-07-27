@@ -1,5 +1,6 @@
 #include <iostream>
 #include <iomanip>
+#include <string.h>
 
 #include "arrays.h"
 #include "rayutils.h"
