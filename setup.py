@@ -1,7 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from setuptools import setup, Extension, find_packages
+from distutils.core import setup
+from setuptools import Extension, find_packages
 from distutils.command.install_data import install_data
 import sys
 import os
