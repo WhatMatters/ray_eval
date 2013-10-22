@@ -6,7 +6,7 @@ from distutils.command.install_data import install_data
 import sys
 import os
 from os.path import join as file_join
-from distutils.command.install import install as _install
+from setuptools.command.install import install as _install
 import imp
 from pkg_resources import resource_filename
 
