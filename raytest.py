@@ -4,8 +4,8 @@ import rayeval
 import time
 
 if __name__ == '__main__':
-    rayeval.load_handranks('HandRanks.dat')
-    rayeval.load_handranks_9('hr9_cpp4.dat')
+    # rayeval.load_handranks('HandRanks.dat')
+    rayeval.load_handranks_9('/usr/local/shared/rayeval_hand_ranks_9.dat')
 
     game = 'omaha'
     # board = '* * * * *'
@@ -18,7 +18,7 @@ if __name__ == '__main__':
     t0 = time.time()
     ev = rayeval.eval_mc('omaha', board, pocket, iterations, n_jobs)
     elapsed = time.time() - t0
-    print '[%s]' % 'omaha', pocket[:1], 'vs', pocket[1:], (
+    print '[%s]' % 'omaha', pocket[:1], 'vs', pocket[1:], 'on board [%s]' % board, (
         ': EV = %.4f%% (%.2gM iterations).' % (100. * ev[0], iterations / 1e6))
     print 'Elapsed: %.2f seconds (%.2fM iterations / sec).\n' % (
         elapsed, iterations / elapsed / 1e6)
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     res = pokereval.PokerEval().poker_eval(game='omaha', board=board_pe,
                                            pockets=pocket_pe, iterations=int(iterations))
     elapsed = time.time() - t0
-    print '[%s]' % 'pokereval', pocket[:1], 'vs', pocket[1:], (
+    print '[%s]' % 'pokereval', pocket[:1], 'vs', pocket[1:], 'on board [%s]' % board, (
         ': EV = %.4f%% (%.2gM iterations).' % (res['eval'][0]['ev'] / 10., iterations / 1e6))
     print 'Elapsed: %.2f seconds (%.2fM iterations / sec).' % (
         elapsed, iterations / elapsed / 1e6)

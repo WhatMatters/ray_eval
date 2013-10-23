@@ -13,5 +13,6 @@
 *.dtrace
 *.plist
 rayeval.egg-info
+build/
 temp/
 rayeval/__rayeval_ranks_path__.txt
