@@ -303,3 +303,12 @@ def eval_mc(game='holdem', board='', pockets=['', ''],
             _rayeval.eval_mc)(game, i_board, i_pockets, iterations / n_jobs)
             for i in xrange(n_jobs))
         return [sum(c) / float(n_jobs) for c in zip(*result)]
+
+def eval_turn_outs_vs_random_omaha(flopBoard, pocket, iterations):
+    i_board = parse_board(flopBoard)
+    i_pocket = parse_pocket(pocket, 'omaha')
+
+
+    for i in dir(_rayeval): print i
+
+    return _rayeval.eval_turn_outs_vs_random_omaha(i_board, i_pocket, iterations)

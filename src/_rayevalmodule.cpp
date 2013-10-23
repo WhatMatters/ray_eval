@@ -596,6 +596,32 @@ static PyObject *_rayeval_eval_mc(PyObject *self, PyObject *args)
    	return py_ev;
 }
 
+static PyObject *_eval_turn_outs_vs_random_omaha(PyObject *self, PyObject *args)
+{
+	PyObject *py_board, *py_pocket, *py_result;
+	int n_board, n_pocket, n_players, iterations;
+	int board[5], pocket[4 * MAX_PLAYERS], is_omaha;
+	char game[] = "omaha";
+
+	if (!PyArg_ParseTuple(args, "OOi", &py_board, &py_pocket, &iterations))
+		return NULL;
+
+	if (!parse_board_and_pockets(game, py_board, py_pocket, board, pocket, 
+		&n_board, &n_pocket, &n_players, &is_omaha))
+		return NULL;
+
+	if (!HR9)
+		RAISE_EXCEPTION(PyExc_RuntimeError, "Please load 9-card hand ranks first.");
+
+	if (n_pocket != 1)
+		RAISE_EXCEPTION(PyExc_RuntimeError, "Number of players must be one.");
+
+   	py_result = PyList_New(n_players);
+
+   	return py_result;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //							MODULE INITIALIZATION
 ////////////////////////////////////////////////////////////////////////////////
@@ -622,6 +648,7 @@ static PyMethodDef _rayeval_methods[] = {
 	{"eval_mc", (PyCFunction) _rayeval_eval_mc, METH_VARARGS, ""},
 	{"eval_hand", (PyCFunction) _rayeval_eval_hand, METH_VARARGS, ""},
 	{"test", (PyCFunction) _rayeval_test, METH_NOARGS, ""},
+	{"eval_turn_outs_vs_random_omaha", (PyCFunction) _eval_turn_outs_vs_random_omaha, METH_VARARGS, ""},
 	{NULL, NULL, 0, NULL}
 };
 
