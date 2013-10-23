@@ -307,8 +307,11 @@ def eval_mc(game='holdem', board='', pockets=['', ''],
 def eval_turn_outs_vs_random_omaha(flopBoard, pocket, iterations):
     i_board = parse_board(flopBoard)
     i_pocket = parse_pocket(pocket, 'omaha')
-
-
-    for i in dir(_rayeval): print i
-
-    return _rayeval.eval_turn_outs_vs_random_omaha(i_board, i_pocket, iterations)
+    iterations = int(iterations)
+    cppresult = _rayeval.eval_turn_outs_vs_random_omaha(i_board, i_pocket, iterations)
+    result = {}
+    result['flop_ev'] = cppresult[0]
+    for i in xrange(52):
+        if cppresult[i + 1] > -0.00001:
+            result[rank_to_card(i)] = cppresult[i + 1]
+    return result

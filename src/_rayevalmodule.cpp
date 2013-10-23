@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <iostream>
 
 #include <Python.h>
 
@@ -596,12 +597,23 @@ static PyObject *_rayeval_eval_mc(PyObject *self, PyObject *args)
    	return py_ev;
 }
 
+/*
+INPUT:
+	board: list (int)
+	pockets: list (int) - must contain 4 cards
+	iterations: int
+OUTPUT:
+	result: list (doble)
+		result[0] - flop ev
+		result[1-52] - ev by turn outs
+*/
 static PyObject *_eval_turn_outs_vs_random_omaha(PyObject *self, PyObject *args)
 {
 	PyObject *py_board, *py_pocket, *py_result;
-	int n_board, n_pocket, n_players, iterations;
-	int board[5], pocket[4 * MAX_PLAYERS], is_omaha;
+	int i, n_board, n_pocket, n_players, iterations;
+	int board[5], pocket[4 * MAX_PLAYERS], is_omaha, turnouts[52];
 	char game[] = "omaha";
+	double ev[MAX_PLAYERS];
 
 	if (!PyArg_ParseTuple(args, "OOi", &py_board, &py_pocket, &iterations))
 		return NULL;
@@ -613,10 +625,44 @@ static PyObject *_eval_turn_outs_vs_random_omaha(PyObject *self, PyObject *args)
 	if (!HR9)
 		RAISE_EXCEPTION(PyExc_RuntimeError, "Please load 9-card hand ranks first.");
 
-	if (n_pocket != 1)
+	if (n_players != 1)
 		RAISE_EXCEPTION(PyExc_RuntimeError, "Number of players must be one.");
 
-   	py_result = PyList_New(n_players);
+	// Villain spectre is all possible pockets
+	pocket[4] = pocket[5] = pocket[6] = pocket[7] = 255;
+
+	// Calculate possible turn outs
+	uint64_t deck = new_deck();
+	for (i = 0; i < n_board; i++)
+		if (board[i] != 255)
+			extract_cards(&deck, board[i]);
+	for (i = 0; i < 4; i++)
+		if (pocket[i] != 255)
+			extract_cards(&deck, pocket[i]);
+	for (int i = 0; i < 52; i++)
+		if (deck & (1LLU << i))
+			turnouts[i] = i;
+		else
+			turnouts[i] = -1;
+
+   	py_result = PyList_New(53);
+
+   	eval_monte_carlo_omaha(iterations, board, n_board, pocket, 2, ev);
+	PyList_SET_ITEM(py_result, (Py_ssize_t) 0, PyFloat_FromDouble(ev[0]));
+
+   	for (i = 0; i < 52; i++)
+	{
+		if (turnouts[i] != -1)
+		{
+			board[3] = turnouts[i];
+	   		eval_monte_carlo_omaha(iterations, board, n_board, pocket, 2, ev);
+			PyList_SET_ITEM(py_result, (Py_ssize_t) (i + 1), PyFloat_FromDouble(ev[0]));
+		}
+		else
+		{
+			PyList_SET_ITEM(py_result, (Py_ssize_t) (i + 1), PyFloat_FromDouble(-1.0));
+		}
+	}
 
    	return py_result;
 }
