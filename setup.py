@@ -62,14 +62,14 @@ def build_and_install_ranks():
     else:
         if not os.path.exists(ARGV_OPTIONS['use_ranks_7']):
             raise IOError, "Hand ranks 7 file not found: %s" % ARGV_OPTIONS['use_ranks_7']
-        ranks_7_path = ARGV_OPTIONS['use_ranks_7']
+        ranks_7_path = os.path.abspath(ARGV_OPTIONS['use_ranks_7'])
 
     if ARGV_OPTIONS['use_ranks_9'] is None:
         ranks_9_path = file_join(INSTALL_DATA_FILES_PATH, ARGV_OPTIONS['hand_ranks_9_file_name'])
     else:
         if not os.path.exists(ARGV_OPTIONS['use_ranks_9']):
             raise IOError, "Hand ranks 9 file not found: %s" % ARGV_OPTIONS['use_ranks_9']
-        ranks_9_path =  ARGV_OPTIONS['use_ranks_9']
+        ranks_9_path = os.path.abspath(ARGV_OPTIONS['use_ranks_9'])
 
     if GENERATE_HAND_RANKS and ARGV_OPTIONS['use_ranks_7'] is None:
         rayeval_module.generate_handranks_7(ranks_7_path, not ARGV_OPTIONS['no_ranks_test'])
