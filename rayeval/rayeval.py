@@ -16,6 +16,19 @@ import pkg_resources
 __card_list = list(''.join(c) for c in itertools.product(
     '23456789TJQKA', 'cdhs'))
 
+__hand_rank_str__ = [
+    "n/a", 
+    "high card",
+    "one pair",
+    "two pair",
+    "three of a kind",
+    "straight",
+    "flush",
+    "full house",
+    "four of a kind",
+    "straight flush"
+]
+
 
 def card_to_rank(card):
     "Convert a string representation of a card to 0:51+255 value."
@@ -286,6 +299,10 @@ def eval_hand(game='holdem', board='', pocket=''):
     i_board = parse_board(board)
     i_pocket = parse_pocket(pocket, game)
     return _rayeval.eval_hand(game, i_board, i_pocket)
+
+
+def hand_rank_str(game='holdem', board='', pocket=''):
+    return __hand_rank_str__[eval_hand(game=game, board=board, pocket=pocket) >> 12]
 
 
 def eval_mc(game='holdem', board='', pockets=['', ''],
