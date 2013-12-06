@@ -21,18 +21,18 @@ if __name__ == '__main__':
         print item
 
     flop_ev = ngbb['flop_ev']
+    outs = ngbb['outs']
     nuts = good = blank = bad = 0
-    for k in ngbb:
-        if k != 'flop_ev':
-            ev = ngbb[k]
-            if ev >= 0.98:
-                nuts = nuts + 1
-            elif ev >= flop_ev + 0.1: 
-                good = good + 1
-            elif ev <= flop_ev - 0.1:
-                bad = bad + 1
-            else:
-                blank = blank + 1
+    for k in outs:
+        ev = outs[k]
+        if ev >= 0.98:
+            nuts = nuts + 1
+        elif ev >= flop_ev + 0.1: 
+            good = good + 1
+        elif ev <= flop_ev - 0.1:
+            bad = bad + 1
+        else:
+            blank = blank + 1
 
     print '[Nuts-Good-Blank-Bad] = [%d-%d-%d-%d]' % (nuts, good, blank, bad)
 
