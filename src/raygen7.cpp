@@ -14,6 +14,14 @@ void init_deck(int *deck)
 			deck[n] = primes[j] | (j << 8) | suit | (1 << (16 + j));
 }
 
+void init_deck_another_way(int *deck)
+{
+    int suit = 0x8000;
+    for (int i = 0; i < 4; i++, suit >>= 1)
+        for (int j = 0; j < 13; j++)
+			deck[j * 4 + i] = primes[j] | (j << 8) | suit | (1 << (16 + j));
+}
+
 short eval_5cards(int c1, int c2, int c3, int c4, int c5)
 {
     int q;

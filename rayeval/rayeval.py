@@ -334,3 +334,25 @@ def eval_turn_outs_vs_random_omaha(flopBoard, pocket, iterations):
         if cppresult[i + 1] > -0.00001:
             outs[rank_to_card(i)] = cppresult[i + 1]
     return result
+
+def find_first_nuts_holdem(flopBoard):
+    i_board = parse_board(flopBoard)
+    cppresult = _rayeval.find_first_nuts_holdem(i_board)
+    return __card_list[cppresult[0]] + ' ' + __card_list[cppresult[1]]
+
+def get_first_nuts_change_next_street(flopBoard):
+    i_board = parse_board(flopBoard)
+    nuts = _rayeval.find_first_nuts_holdem(i_board)
+
+    result = {}
+    for c in __card_list:
+        i_c = card_to_rank(c)
+        if i_c in i_board: continue
+
+        turn_arr = i_board + [i_c]
+        turnnuts = _rayeval.find_first_nuts_holdem(turn_arr)
+        if turnnuts[0] != nuts[0] or turnnuts[1] != nuts[1]:
+            s = __card_list[turnnuts[0]] + ' ' + __card_list[turnnuts[1]]
+            result[c] = s
+
+    return result

@@ -38,6 +38,62 @@ uint64_t new_deck()
 	return deck;
 }
 
+void find_first_nuts_holdem(int *board, int n_board, int *result_pocket)
+{
+	int deck[52];
+	int dead[52];
+	int wcards[7];
+	memset(dead, 0, 52 * sizeof(int));
+	init_deck_another_way(deck);
+	
+	for (int i = 0; i < n_board; i++)
+	{
+		dead[board[i]] = 1;
+		wcards[i] = deck[board[i]];
+	}
+		
+	short best_score = 9999;
+
+	for (int c1 = 0; c1 < 52; c1++)
+	for (int c2 = c1 + 1; c2 < 52; c2++)
+	{
+		if (dead[c1] == 1 || dead[c2] == 1) continue;
+
+		int card1 = deck[c1];
+		int card2 = deck[c2];
+
+		short score;
+		switch (n_board)
+		{  
+			case 3:  
+				score = eval_5cards(wcards[0], wcards[1], wcards[2], card1, card2);
+				break;
+			case 4:  
+				score =            eval_5cards(wcards[0], wcards[1], wcards[2], wcards[3], card1);
+				score = MIN(score, eval_5cards(wcards[0], wcards[1], wcards[2], wcards[3], card2));
+				score = MIN(score, eval_5cards(wcards[0], wcards[1], wcards[2], card1,     card2));
+				score = MIN(score, eval_5cards(wcards[0], wcards[1], wcards[3], card1,     card2));
+				score = MIN(score, eval_5cards(wcards[0], wcards[2], wcards[3], card1,     card2));
+				score = MIN(score, eval_5cards(wcards[1], wcards[2], wcards[3], card1,     card2));
+				break;
+			case 5: 
+				wcards[5] = card1;
+				wcards[6] = card2;
+				score = eval_7hand(wcards);
+				break;
+			default:
+				return;
+		}
+
+		if (score < best_score)
+		{
+			best_score = score;
+			result_pocket[0] = c1;
+			result_pocket[1] = c2;
+		}
+	}
+}
+
 int eval_monte_carlo_holdem(int N, int *board, int n_board, 
 	int *pocket, int n_players, double *ev)
 {
@@ -597,6 +653,49 @@ static PyObject *_rayeval_eval_mc(PyObject *self, PyObject *args)
    	return py_ev;
 }
 
+// INPUT:
+// 		board: list(int)
+// OUTPUT:
+//		result: list (int) size 2 - 2 cards of the nuts
+static PyObject *_find_first_nuts_holdem(PyObject *self, PyObject *args)
+{
+	int board[5], result_pocket[2];
+
+	PyObject *py_board;
+	if (!PyArg_ParseTuple(args, "O", &py_board))
+		return NULL;
+
+	if (!PyList_Check(py_board)) 
+    	RAISE_EXCEPTION(PyExc_TypeError, "Board must be a list.");
+
+ 	int n_board = (int) PyList_Size(py_board);
+
+    if (n_board != 3 && n_board != 4 && n_board != 5)
+    	RAISE_EXCEPTION(PyExc_ValueError, "Board must contain 3-5 cards.");
+
+    for (int i = 0; i < n_board; i++)
+    {
+    	PyObject *item = PyList_GetItem(py_board, i);
+    	if (!PyInt_Check(item))
+	    	RAISE_EXCEPTION(PyExc_TypeError, "Board cards must be integers.");
+    	board[i] = (int) PyInt_AsLong(item);
+    	if (board[i] < 0 || board[i] > 51)
+	    	RAISE_EXCEPTION(PyExc_TypeError, "Board cards must be 0-51.");
+    }
+
+	if (!HR)
+		RAISE_EXCEPTION(PyExc_RuntimeError, "Please load 7-card hand ranks first.");
+
+	find_first_nuts_holdem(board, n_board, result_pocket);
+
+	PyObject *py_result = PyList_New(2);
+
+	PyList_SET_ITEM(py_result, (Py_ssize_t) 0, PyInt_FromLong((long)result_pocket[0]));
+	PyList_SET_ITEM(py_result, (Py_ssize_t) 1, PyInt_FromLong((long)result_pocket[1]));
+
+    return py_result;
+}
+
 /*
 INPUT:
 	board: list (int)
@@ -695,6 +794,7 @@ static PyMethodDef _rayeval_methods[] = {
 	{"eval_hand", (PyCFunction) _rayeval_eval_hand, METH_VARARGS, ""},
 	{"test", (PyCFunction) _rayeval_test, METH_NOARGS, ""},
 	{"eval_turn_outs_vs_random_omaha", (PyCFunction) _eval_turn_outs_vs_random_omaha, METH_VARARGS, ""},
+	{"find_first_nuts_holdem", (PyCFunction) _find_first_nuts_holdem, METH_VARARGS, ""},
 	{NULL, NULL, 0, NULL}
 };
 
