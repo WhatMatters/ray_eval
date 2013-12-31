@@ -139,13 +139,15 @@ setup(name='rayeval',
                         '-msse4',
                         '-fPIC',
                         '-g',
-                        '-gdwarf-2'],
+                        '-gdwarf-2',
+                        '-stdlib=libstdc++'],
                     extra_link_args=[
                         '-O3',
                         '-msse4',
                         '-fPIC',
                         '-g',
-                        '-gdwarf-2'])
+                        '-gdwarf-2',
+                        '-stdlib=libstdc++'])
       ],
       keywords='poker monte-carlo eval omaha holdem',
       license='LICENSE.txt'
