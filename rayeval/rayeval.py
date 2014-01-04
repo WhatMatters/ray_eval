@@ -304,6 +304,19 @@ def eval_hand(game='holdem', board='', pocket=''):
 def hand_rank_str(game='holdem', board='', pocket=''):
     return __hand_rank_str__[eval_hand(game=game, board=board, pocket=pocket) >> 12]
 
+def hand_draw_outs(game='omaha', board='', pocket='', draw='straight'):
+    i_board = parse_board(board)
+    i_pocket = parse_pocket(pocket, game)
+
+    outs = 0
+    for c in __card_list:
+        i_c = card_to_rank(c)
+        if i_c in i_board or i_c in i_pocket:
+            continue
+        if hand_rank_str(game, board + ' ' + c, pocket) is draw:
+            outs += 1
+    return outs
+
 
 def eval_mc(game='holdem', board='', pockets=['', ''],
             iterations=1e6, n_jobs=1):
