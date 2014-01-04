@@ -310,13 +310,84 @@ def hand_draw_outs(game='omaha', board='', pocket='', draw='straight'):
     i_pocket = parse_pocket(pocket, game)
 
     outs = 0
+    nut_outs = 0
+
     for c in __card_list:
         i_c = card_to_rank(c)
         if i_c in i_board or i_c in i_pocket:
             continue
-        if hand_rank_str(game, board + ' ' + c, pocket) is draw:
+        new_board = board + ' ' + c
+        if hand_rank_str(game, new_board, pocket) is draw:
             outs += 1
-    return outs
+            if is_first_nuts(new_board, pocket, draw):
+                nut_outs += 1
+    return outs, nut_outs
+
+
+def hand_draw_type(board='', pocket=''):
+    s_outs, s_nut_outs = hand_draw_outs('omaha', board, pocket, 'straight')
+    f_outs, f_nut_outs = hand_draw_outs('omaha', board, pocket, 'flush')
+    outs = s_outs + f_outs
+    nut_outs = s_nut_outs + f_nut_outs
+    if outs == 0:
+        return 'ND'
+    if outs < 8:
+        return 'WD'
+    if outs < 11:
+        if nut_outs < 3:
+            return 'WD'
+        return 'GD'
+    return 'SD'
+
+
+def is_first_nuts(board='', pocket='', draw=''):
+    if first_nuts_type(board) != draw:
+        return False
+
+    i_board = parse_board(board)
+    i_pocket = parse_pocket(pocket, 'omaha')
+    cards_by_suit = [[], [], [], []]
+    board_cards = []
+    pocket_cards = []
+
+    for card in i_board:
+        c, s = divmod(card, 4)
+        cards_by_suit[s].append(c)
+        board_cards.append(c)
+
+    for card in i_pocket:
+        c, s = divmod(card, 4)
+        cards_by_suit[s].append(c)
+        pocket_cards.append(c)
+
+    if draw is 'flush':
+        for cards in cards_by_suit:
+            if len(cards) > 2:
+                cards.sort()
+                cards.reverse()
+                if cards[0] == 12 and cards[1] == 11 and cards[2] == 10:
+                    return True
+
+    if draw is 'straight':
+        board_cards.sort()
+        board_cards.reverse()
+        si = -1
+        if board_cards[0] - board_cards[2] < 5:
+            si = 0
+        elif len(board_cards) is 4 and board_cards[1] - board_cards[3] < 5:
+            si = 1
+        elif len(board_cards) is 5 and board_cards[2] - board_cards[4] < 5:
+            si = 2
+
+        nut_card = board_cards[si] + (4 - board_cards[si] + board_cards[si + 2])
+
+        if si > -1:
+            for i in range(5):
+                if nut_card - i not in board_cards and nut_card - i not in pocket_cards:
+                    return False
+            return True
+
+    return False
 
 
 def hand_draw_nut_outs(game='omaha', board='', pocket='', draw='straight'):
@@ -371,6 +442,7 @@ def texture_change(board='', next_card=''):
     if current_nuts == new_nuts:
         return 'blank'
     return new_nuts
+
 
 def eval_mc(game='holdem', board='', pockets=['', ''],
             iterations=1e6, n_jobs=1):
