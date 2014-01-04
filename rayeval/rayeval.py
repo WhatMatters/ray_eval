@@ -304,6 +304,7 @@ def eval_hand(game='holdem', board='', pocket=''):
 def hand_rank_str(game='holdem', board='', pocket=''):
     return __hand_rank_str__[eval_hand(game=game, board=board, pocket=pocket) >> 12]
 
+
 def hand_draw_outs(game='omaha', board='', pocket='', draw='straight'):
     i_board = parse_board(board)
     i_pocket = parse_pocket(pocket, game)
@@ -317,6 +318,59 @@ def hand_draw_outs(game='omaha', board='', pocket='', draw='straight'):
             outs += 1
     return outs
 
+
+def hand_draw_nut_outs(game='omaha', board='', pocket='', draw='straight'):
+    i_board = parse_board(board)
+    i_pocket = parse_pocket(pocket, game)
+
+    outs = 0
+    for c in __card_list:
+        i_c = card_to_rank(c)
+        if i_c in i_board or i_c in i_pocket:
+            continue
+        if hand_rank_str(game, board + ' ' + c, pocket) is draw:
+            outs += 1
+    return outs
+
+
+def first_nuts_type(board=''):
+    i_board = parse_board(board)
+
+    suits = [0, 0, 0, 0]
+    cards = []
+
+    for i in i_board:
+        c, s = divmod(i, 4)
+        suits[s] += 1
+        cards.append(c)
+
+    cards.sort()
+    cards.reverse()
+
+    p_c = -1
+    for c in cards:
+        if c == p_c:
+            return 'full house'
+        p_c = c
+
+    if suits[0] > 2 or suits[1] > 2 or suits[2] > 2 or suits[3] > 2:
+        return 'flush'
+
+    if (len(cards) == 3 and cards[0] - cards[2] < 5) or \
+            (len(cards) == 4 and (cards[0] - cards[2] < 5 or cards[1] - cards[3] < 5)) or \
+            (len(cards) == 5 and (cards[0] - cards[2] < 5 or cards[1] - cards[3] < 5 or cards[2] - cards[4] < 5)):
+        return 'straight'
+
+    return 'set'
+
+
+def texture_change(board='', next_card=''):
+    current_nuts = first_nuts_type(board)
+    new_nuts = first_nuts_type(board + ' ' + next_card)
+
+    if current_nuts == new_nuts:
+        return 'blank'
+    return new_nuts
 
 def eval_mc(game='holdem', board='', pockets=['', ''],
             iterations=1e6, n_jobs=1):
@@ -334,6 +388,7 @@ def eval_mc(game='holdem', board='', pockets=['', ''],
             for i in xrange(n_jobs))
         return [sum(c) / float(n_jobs) for c in zip(*result)]
 
+
 def eval_turn_outs_vs_random_omaha(flopBoard, pocket, iterations):
     i_board = parse_board(flopBoard)
     i_pocket = parse_pocket(pocket, 'omaha')
@@ -348,10 +403,12 @@ def eval_turn_outs_vs_random_omaha(flopBoard, pocket, iterations):
             outs[rank_to_card(i)] = cppresult[i + 1]
     return result
 
+
 def find_first_nuts_holdem(flopBoard):
     i_board = parse_board(flopBoard)
     cppresult = _rayeval.find_first_nuts_holdem(i_board)
     return __card_list[cppresult[0]] + ' ' + __card_list[cppresult[1]]
+
 
 def get_first_nuts_change_next_street(flopBoard):
     i_board = parse_board(flopBoard)
