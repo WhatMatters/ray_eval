@@ -324,7 +324,7 @@ def hand_draw_outs(game='omaha', board='', pocket='', draw='straight'):
     return outs, nut_outs
 
 
-def hand_draw_type(board='', pocket=''):
+def draw_type(board='', pocket=''):
     s_outs, s_nut_outs = hand_draw_outs('omaha', board, pocket, 'straight')
     f_outs, f_nut_outs = hand_draw_outs('omaha', board, pocket, 'flush')
     outs = s_outs + f_outs
@@ -338,6 +338,50 @@ def hand_draw_type(board='', pocket=''):
             return 'WD'
         return 'GD'
     return 'SD'
+
+
+def made_hand_type(board='', pocket=''):
+    i_board = parse_board(board)
+    i_pocket = parse_pocket(pocket, 'omaha')
+
+    bc = []
+    pc = []
+
+    for card in i_board:
+        c, s = divmod(card, 4)
+        bc.append(c)
+
+    for card in i_pocket:
+        c, s = divmod(card, 4)
+        pc.append(c)
+
+    bc.sort()
+    bc.reverse()
+    pc.sort()
+    pc.reverse()
+
+    hand = hand_rank_str('omaha', board, pocket)
+
+    if hand in ["two pair", "three of a kind", "straight", "flush", "full house", "four of a kind", "straight flush"]:
+        return '2P+'
+    if hand in ["n/a", "high card"]:
+        return 'WMH'
+
+    prev = -1
+    pp = -1
+    for c in pc:
+        if c == prev:
+            pp = c
+            break
+        prev = c
+
+    if pp > bc[0]:
+        return 'OP'
+
+    if bc[0] in pc and (pc[0] is 12 or pc[0] is 11 or pc[1] is 11):
+        return 'TPGK'
+
+    return 'WMH'
 
 
 def is_first_nuts(board='', pocket='', draw=''):
