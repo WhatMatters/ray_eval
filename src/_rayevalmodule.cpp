@@ -683,9 +683,6 @@ static PyObject *_find_first_nuts_holdem(PyObject *self, PyObject *args)
 	    	RAISE_EXCEPTION(PyExc_TypeError, "Board cards must be 0-51.");
     }
 
-	if (!HR)
-		RAISE_EXCEPTION(PyExc_RuntimeError, "Please load 7-card hand ranks first.");
-
 	find_first_nuts_holdem(board, n_board, result_pocket);
 
 	PyObject *py_result = PyList_New(2);
