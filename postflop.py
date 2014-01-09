@@ -12,7 +12,3 @@ if __name__ == '__main__':
     print 'Kd 7s 2c', rayeval.texture_changing_cards_count('Kd 7s 2c')
     print 'Kd 2s 2c', rayeval.texture_changing_cards_count('Kd 2s 2c')
     print 'Ks 7s 2s', rayeval.texture_changing_cards_count('Ks 7s 2s')
-
-    pocket = rayeval.parse_pocket2('Ks 7s 2c Td', 'omaha')
-    pocket.sort()
-    print ''.join([rayeval.rank_to_card2(r) for r in pocket])

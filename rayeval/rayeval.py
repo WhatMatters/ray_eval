@@ -15,8 +15,6 @@ import pkg_resources
 
 __card_list = list(''.join(c) for c in itertools.product(
     '23456789TJQKA', 'cdhs'))
-__card_list2 = list(''.join(c) for c in itertools.product(
-    'cdhs', '23456789TJQKA'))
 
 __hand_rank_str__ = [
     "n/a", 
@@ -39,21 +37,10 @@ def card_to_rank(card):
     else:
         return __card_list.index(card[0].upper() + card[1].lower())
 
-def card_to_rank2(card):
-    "Convert a string representation of a card to 0:51+255 value."
-    if card in ('*', '__', '_'):
-        return 255
-    else:
-        return __card_list2.index(card[1].lower() + card[0].upper())
-
 
 def rank_to_card(rank):
     "Convert 0:51+255 card rank to a string value."
     return __card_list[rank]
-
-def rank_to_card2(rank):
-    "Convert 0:51+255 card rank to a string value."
-    return __card_list2[rank][1] + __card_list2[rank][0]
 
 
 def is_iterable(x):
@@ -287,16 +274,6 @@ def parse_pocket(pocket, game):
         raise ValueError('Invalid pocket size for selected game type.')
     return [card_to_rank(c) for c in pocket] + [255] * (pocket_size - len(pocket))
 
-def parse_pocket2(pocket, game):
-    pocket_size = 2 if game == 'holdem' else 4
-    if isinstance(pocket, basestring):
-        pocket = split_string(pocket)
-    if not is_iterable(pocket):
-        raise TypeError('Pocket must be a list, a tuple or a string.')
-    if len(pocket) > pocket_size:
-        raise ValueError('Invalid pocket size for selected game type.')
-    return [card_to_rank2(c) for c in pocket] + [255] * (pocket_size - len(pocket))
-
 def parse_pockets(pockets, game):
     if isinstance(pockets, basestring):
         pockets = split_string(pockets)
@@ -352,8 +329,6 @@ def draw_type(board='', pocket=''):
     f_outs, f_nut_outs = hand_draw_outs('omaha', board, pocket, 'flush')
     outs = s_outs + f_outs
     nut_outs = s_nut_outs + f_nut_outs
-    print 'outs', outs
-    print 'nut', nut_outs
     if outs == 0:
         return 'ND'
     if outs < 8:
