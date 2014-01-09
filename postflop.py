@@ -6,5 +6,13 @@ if __name__ == '__main__':
     rayeval.load_handranks_9('/usr/local/shared/rayeval_hand_ranks_9.dat')
     rayeval.load_handranks_7('/usr/local/shared/rayeval_hand_ranks_7.dat')
 
-    print rayeval.made_hand_type("9c 8s 2d", "Jc Qd 3c 9s")
-    print rayeval.draw_type("9c 8d 2d", "Jd Qd 3c 9s")
+    print rayeval.made_hand_type("Js 7c 5s", "6d 2c 4c 2h")
+    print rayeval.draw_type("Js 7c 5s", "6d 2c 4c 2h")
+    print 'Js 7c 5s', rayeval.texture_changing_cards_count('Js 7c 5s')
+    print 'Kd 7s 2c', rayeval.texture_changing_cards_count('Kd 7s 2c')
+    print 'Kd 2s 2c', rayeval.texture_changing_cards_count('Kd 2s 2c')
+    print 'Ks 7s 2s', rayeval.texture_changing_cards_count('Ks 7s 2s')
+
+    pocket = rayeval.parse_pocket2('Ks 7s 2c Td', 'omaha')
+    pocket.sort()
+    print ''.join([rayeval.rank_to_card2(r) for r in pocket])
