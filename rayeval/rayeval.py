@@ -354,10 +354,13 @@ def hand_draw_outs_i(game, i_board, i_pocket, draw):
     return outs, nut_outs
 
 
-@profile
 def draw_type(board='', pocket=''):
     i_board = parse_board_fast(board)
     i_pocket = parse_pocket_fast(pocket, 'omaha')
+    return draw_type_i(i_board, i_pocket)
+
+
+def draw_type_i(i_board, i_pocket):
     s_outs, s_nut_outs = hand_draw_outs_i('omaha', i_board, i_pocket, 'straight')
     f_outs, f_nut_outs = hand_draw_outs_i('omaha', i_board, i_pocket, 'flush')
     outs = s_outs + f_outs
@@ -420,7 +423,7 @@ def made_hand_type(board='', pocket=''):
     i_pocket = parse_pocket(pocket, 'omaha')
     return made_hand_type_i(i_board, i_pocket)
 
-@profile
+
 def made_hand_type_fast(board='', pocket=''):
     i_board = parse_board_fast(board)
     i_pocket = parse_pocket_fast(pocket, 'omaha')
