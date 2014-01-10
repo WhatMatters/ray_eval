@@ -29,13 +29,14 @@ __hand_rank_str__ = [
     "straight flush"
 ]
 
-
 def card_to_rank(card):
     "Convert a string representation of a card to 0:51+255 value."
     if card in ('*', '__', '_'):
         return 255
     else:
-        return __card_list.index(card[0].upper() + card[1].lower())
+        index = card[0].upper() + card[1].lower()
+        return __card_list.index(index)
+
 
 
 def rank_to_card(rank):
@@ -48,7 +49,16 @@ def is_iterable(x):
 
 
 def split_string(x):
-    return [] if not x.strip() else [c.strip() for c in x.split(' ')]
+    if not x.strip():
+        return []
+    else:
+        s = x.split(' ')
+        return [c.strip() for c in s]
+
+
+def split_string_fast(x):
+    return x.split(' ')
+
 
 
 def get_handranks_7_filename():
@@ -263,7 +273,6 @@ def parse_board(board):
         raise ValueError('Invalid board size.')
     return [card_to_rank(c) for c in board]
 
-
 def parse_pocket(pocket, game):
     pocket_size = 2 if game == 'holdem' else 4
     if isinstance(pocket, basestring):
@@ -273,6 +282,16 @@ def parse_pocket(pocket, game):
     if len(pocket) > pocket_size:
         raise ValueError('Invalid pocket size for selected game type.')
     return [card_to_rank(c) for c in pocket] + [255] * (pocket_size - len(pocket))
+
+
+def parse_board_fast(board):
+    board = split_string_fast(board)
+    return [card_to_rank(c) for c in board]
+
+
+def parse_pocket_fast(pocket, game):
+    pocket = split_string_fast(pocket)
+    return [card_to_rank(c) for c in pocket]
 
 def parse_pockets(pockets, game):
     if isinstance(pockets, basestring):
@@ -292,11 +311,14 @@ def parse_game(game):
         raise ValueError('Invalid game type.')
     return game
 
-
 def eval_hand(game='holdem', board='', pocket=''):
     game = parse_game(game)
     i_board = parse_board(board)
     i_pocket = parse_pocket(pocket, game)
+    return eval_hand_i(game, i_board, i_pocket)
+
+
+def eval_hand_i(game, i_board, i_pocket):
     return _rayeval.eval_hand(game, i_board, i_pocket)
 
 
@@ -304,29 +326,40 @@ def hand_rank_str(game='holdem', board='', pocket=''):
     return __hand_rank_str__[eval_hand(game=game, board=board, pocket=pocket) >> 12]
 
 
+def hand_rank_str_i(game, i_board, i_pocket):
+    return __hand_rank_str__[eval_hand_i(game=game, i_board=i_board, i_pocket=i_pocket) >> 12]
+
+
 def hand_draw_outs(game='omaha', board='', pocket='', draw='straight'):
     i_board = parse_board(board)
     i_pocket = parse_pocket(pocket, game)
 
+    return hand_draw_outs_i(game, i_board, i_pocket, draw)
+
+
+def hand_draw_outs_i(game, i_board, i_pocket, draw):
     outs = 0
     nut_outs = 0
 
-    for c in __card_list:
-        i_c = card_to_rank(c)
+    for i_c in range(51):
         if i_c in i_board or i_c in i_pocket:
             continue
-        new_board = board + ' ' + c
-
-        if texture_change(board, c) is draw and hand_rank_str(game, new_board, pocket) is draw:
-            outs += 1
-            if is_first_nuts(new_board, pocket, draw):
-                nut_outs += 1
+        if texture_change(i_board, i_c) is draw:
+            i_board.append(i_c)
+            if hand_rank_str_i(game, i_board, i_pocket) is draw:
+                outs += 1
+                if is_first_nuts(i_board, i_pocket, draw):
+                    nut_outs += 1
+            i_board.pop()
     return outs, nut_outs
 
 
+@profile
 def draw_type(board='', pocket=''):
-    s_outs, s_nut_outs = hand_draw_outs('omaha', board, pocket, 'straight')
-    f_outs, f_nut_outs = hand_draw_outs('omaha', board, pocket, 'flush')
+    i_board = parse_board_fast(board)
+    i_pocket = parse_pocket_fast(pocket, 'omaha')
+    s_outs, s_nut_outs = hand_draw_outs_i('omaha', i_board, i_pocket, 'straight')
+    f_outs, f_nut_outs = hand_draw_outs_i('omaha', i_board, i_pocket, 'flush')
     outs = s_outs + f_outs
     nut_outs = s_nut_outs + f_nut_outs
     if outs == 0:
@@ -340,10 +373,7 @@ def draw_type(board='', pocket=''):
     return 'SD'
 
 
-def made_hand_type(board='', pocket=''):
-    i_board = parse_board(board)
-    i_pocket = parse_pocket(pocket, 'omaha')
-
+def made_hand_type_i(i_board, i_pocket):
     bc = []
     pc = []
 
@@ -360,7 +390,7 @@ def made_hand_type(board='', pocket=''):
     pc.sort()
     pc.reverse()
 
-    hand = hand_rank_str('omaha', board, pocket)
+    hand = hand_rank_str_i('omaha', i_board, i_pocket)
 
     if hand in ["two pair", "three of a kind", "straight", "flush", "full house", "four of a kind", "straight flush"]:
         return '2P+'
@@ -384,6 +414,19 @@ def made_hand_type(board='', pocket=''):
     return 'WMH'
 
 
+
+def made_hand_type(board='', pocket=''):
+    i_board = parse_board(board)
+    i_pocket = parse_pocket(pocket, 'omaha')
+    return made_hand_type_i(i_board, i_pocket)
+
+@profile
+def made_hand_type_fast(board='', pocket=''):
+    i_board = parse_board_fast(board)
+    i_pocket = parse_pocket_fast(pocket, 'omaha')
+    return made_hand_type_i(i_board, i_pocket)
+
+
 def texture_changing_cards_count(board=''):
     count = 0
     i_board = parse_board(board)
@@ -396,12 +439,10 @@ def texture_changing_cards_count(board=''):
     return count
 
 
-def is_first_nuts(board='', pocket='', draw=''):
-    if first_nuts_type(board) != draw:
+def is_first_nuts(i_board, i_pocket, draw):
+    if first_nuts_type(i_board) != draw:
         return False
 
-    i_board = parse_board(board)
-    i_pocket = parse_pocket(pocket, 'omaha')
     cards_by_suit = [[], [], [], []]
     board_cards = []
     pocket_cards = []
@@ -446,22 +487,19 @@ def is_first_nuts(board='', pocket='', draw=''):
     return False
 
 
-def hand_draw_nut_outs(game='omaha', board='', pocket='', draw='straight'):
-    i_board = parse_board(board)
-    i_pocket = parse_pocket(pocket, game)
-
+def hand_draw_nut_outs(game, i_board, i_pocket, draw):
     outs = 0
-    for c in __card_list:
-        i_c = card_to_rank(c)
+    for i_c in range(51):
         if i_c in i_board or i_c in i_pocket:
             continue
-        if hand_rank_str(game, board + ' ' + c, pocket) is draw:
+        i_board.append(i_c)
+        if hand_rank_str_i(game, i_board, i_pocket) is draw:
             outs += 1
+        i_board.pop()
     return outs
 
 
-def first_nuts_type(board=''):
-    i_board = parse_board(board)
+def first_nuts_type(i_board):
 
     suits = [0, 0, 0, 0]
     cards = []
@@ -491,9 +529,11 @@ def first_nuts_type(board=''):
     return 'set'
 
 
-def texture_change(board='', next_card=''):
-    current_nuts = first_nuts_type(board)
-    new_nuts = first_nuts_type(board + ' ' + next_card)
+def texture_change(i_board, next_card):
+    current_nuts = first_nuts_type(i_board)
+    i_board.append(next_card)
+    new_nuts = first_nuts_type(i_board)
+    i_board.pop()
 
     if current_nuts == new_nuts:
         return 'blank'
