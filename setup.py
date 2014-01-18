@@ -125,7 +125,7 @@ class install(_install):
 
 
 setup(name='rayeval',
-      version='0.2',
+      version='0.2.1',
       cmdclass={'install': install, 'install_data': install_hand_ranks},
       description='Ray Eval',
       author='Aldanor',

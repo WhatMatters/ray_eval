@@ -446,7 +446,7 @@ def texture_changing_cards_count_i(i_board):
         i_c = card_to_rank(c)
         if i_c in i_board:
             continue
-        if texture_change(i_board, c) is not 'blank':
+        if texture_change(i_board, i_c) is not 'blank':
             count += 1
     return count
 
