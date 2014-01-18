@@ -9,6 +9,15 @@ from os.path import join as file_join
 from setuptools.command.install import install as _install
 import imp
 from pkg_resources import resource_filename
+import platform
+
+
+if platform.system() == 'Darwin':
+    extra_compile_args = ['-O3', '-msse4', '-fPIC', '-g', '-gdwarf-2', '-stdlib=libstdc++']
+    extra_link_args = ['-O3', '-msse4', '-fPIC', '-g', '-gdwarf-2', '-stdlib=libstdc++']
+else:
+    extra_compile_args = ['-O3', '-msse4', '-fPIC', '-g', '-gdwarf-2']
+    extra_link_args = ['-O3', '-msse4', '-fPIC', '-g', '-gdwarf-2']
 
 
 INSTALL_LIB_PATH = ''
@@ -134,20 +143,8 @@ setup(name='rayeval',
                         'src/rayutils.cpp',
                         'src/raygen7.cpp',
                         'src/raygen9.cpp'],
-                    extra_compile_args=[
-                        '-O3',
-                        '-msse4',
-                        '-fPIC',
-                        '-g',
-                        '-gdwarf-2',
-                        '-stdlib=libstdc++'],
-                    extra_link_args=[
-                        '-O3',
-                        '-msse4',
-                        '-fPIC',
-                        '-g',
-                        '-gdwarf-2',
-                        '-stdlib=libstdc++'])
+                    extra_compile_args=extra_compile_args,
+                    extra_link_args=extra_link_args)
       ],
       keywords='poker monte-carlo eval omaha holdem',
       license='LICENSE.txt'
