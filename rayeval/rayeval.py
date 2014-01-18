@@ -436,13 +436,17 @@ def made_hand_type_fast(board='', pocket=''):
 
 
 def texture_changing_cards_count(board=''):
-    count = 0
     i_board = parse_board(board)
+    return texture_changing_cards_count_i(i_board)
+
+
+def texture_changing_cards_count_i(i_board):
+    count = 0
     for c in __card_list:
         i_c = card_to_rank(c)
         if i_c in i_board:
             continue
-        if texture_change(board, c) is not 'blank':
+        if texture_change(i_board, c) is not 'blank':
             count += 1
     return count
 
