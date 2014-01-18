@@ -29,8 +29,11 @@ __hand_rank_str__ = [
     "straight flush"
 ]
 
+
 def card_to_rank(card):
-    "Convert a string representation of a card to 0:51+255 value."
+    """
+    Convert a string representation of a card to 0:51+255 value.
+    """
     if card in ('*', '__', '_'):
         return 255
     else:
@@ -38,9 +41,10 @@ def card_to_rank(card):
         return __card_list.index(index)
 
 
-
 def rank_to_card(rank):
-    "Convert 0:51+255 card rank to a string value."
+    """
+    Convert 0:51+255 card rank to a string value.
+    """
     return __card_list[rank]
 
 
@@ -58,7 +62,6 @@ def split_string(x):
 
 def split_string_fast(x):
     return x.split(' ')
-
 
 
 def get_handranks_7_filename():
@@ -273,6 +276,7 @@ def parse_board(board):
         raise ValueError('Invalid board size.')
     return [card_to_rank(c) for c in board]
 
+
 def parse_pocket(pocket, game):
     pocket_size = 2 if game == 'holdem' else 4
     if isinstance(pocket, basestring):
@@ -293,6 +297,7 @@ def parse_pocket_fast(pocket, game):
     pocket = split_string_fast(pocket)
     return [card_to_rank(c) for c in pocket]
 
+
 def parse_pockets(pockets, game):
     if isinstance(pockets, basestring):
         pockets = split_string(pockets)
@@ -310,6 +315,7 @@ def parse_game(game):
     if game not in ('holdem', 'omaha'):
         raise ValueError('Invalid game type.')
     return game
+
 
 def eval_hand(game='holdem', board='', pocket=''):
     game = parse_game(game)
@@ -415,7 +421,6 @@ def made_hand_type_i(i_board, i_pocket):
         return 'TPGK'
 
     return 'WMH'
-
 
 
 def made_hand_type(board='', pocket=''):
