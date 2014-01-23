@@ -435,12 +435,7 @@ def made_hand_type_fast(board='', pocket=''):
     return made_hand_type_i(i_board, i_pocket)
 
 
-def texture_changing_cards_count(board=''):
-    i_board = parse_board(board)
-    return texture_changing_cards_count_i(i_board)
-
-
-def texture_changing_cards_count_i(i_board):
+def texture_changing_cards_count(i_board):
     count = 0
     for i_c in range(52):
         if i_c in i_board:
