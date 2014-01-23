@@ -341,7 +341,7 @@ def hand_draw_outs_i(game, i_board, i_pocket, draw):
     outs = 0
     nut_outs = 0
 
-    for i_c in range(51):
+    for i_c in range(52):
         if i_c in i_board or i_c in i_pocket:
             continue
         if texture_change(i_board, i_c) is draw:
@@ -430,14 +430,12 @@ def made_hand_type_fast(board='', pocket=''):
     return made_hand_type_i(i_board, i_pocket)
 
 
-def texture_changing_cards_count(board=''):
+def texture_changing_cards_count(i_board):
     count = 0
-    i_board = parse_board(board)
-    for c in __card_list:
-        i_c = card_to_rank(c)
+    for i_c in range(52):
         if i_c in i_board:
             continue
-        if texture_change(board, c) is not 'blank':
+        if texture_change(i_board, i_c) is not 'blank':
             count += 1
     return count
 
