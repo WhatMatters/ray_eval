@@ -1,3 +1,11 @@
+/*
+** This file was extracted from the Cactus Kev's Poker Hand 
+** Evaluator, read more about it at: 
+** http://www.suffecool.net/poker/evaluator.html
+** 
+** Written by Kevin L. Suffecool, Copyright.
+/*
+
 #include "arrays.h"
 
 /*

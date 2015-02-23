@@ -1,3 +1,8 @@
+Rayeval is a poker evaluation library. It is based on the idea of the LUT-based 7-cards evaluator and 
+Ray Wotton's (RayW) hand evaluator. But Rayeval can also evaluate 9-card hands, what makes it one of the 
+fastes Omaha hand evaluator.
+
+
 Installation
 ============
 
@@ -77,5 +82,53 @@ For example in Mac OS X you can update your shm settings (reboot is not required
 
 License
 =======
-Rayeval is Copyright © 2013 Whatmatters. It is free software, and may be redistributed under the terms specified in the
-GNU GENERAL PUBLIC LICENSE Version 2 or higher (see LICENSE.txt file).
+Rayeval is Copyright © 2013 Whatmatters, also some parts of the code shares copyright 
+with Ray Wooten, Kevin L. Suffecool and probabply some of participants in the 2+2 forum thread 
+(see http://archives1.twoplustwo.com/showflat.php?Cat=0&Number=8513906&page=0&fpart=13&vc=1)
+
+It is free software, and may be redistributed under the terms specified in the
+GNU GENERAL PUBLIC LICENSE Version 2 or higher (see LICENSE.txt).
+
+For list of authors see AUTHORS.txt
+
+This project is based on Cactus Kev's evaluator and inherits code from it, also it is based on the 
+idea of LUT-based 7-cards evaluator and Ray Wotton's (RayW) hand evaluator and inherits code from it
+and on the twoplustwo forum thread (http://archives1.twoplustwo.com/showflat.php?Cat=0&Number=8513906&page=0&fpart=13&vc=1)
+in general.
+
+The Ray Wooten, twoplustwo, and all derivations of it are made available 
+through GPL v2 or later, based on the following:
+
+(See http://pokerai.org/pf3/viewtopic.php?f=3&t=1451)
+
+1) Also mykey1961 claimed that he first came with the idea of LUT-based 7-cards
+hand evaluator, and that he makes this available in the public domain. We aren't sure
+that he should be mentioned in AUTHORS.txt file, but he definetly must be mentioned here.
+
+2) RayW posted his code on 2+2 udner GPL:
+// HandRankSetup.cpp : Sets up the HandRank File for VERY fast Lookups
+// by Ray Wotton and the 2+2 list My code is GPL, use it as you like
+(see http://archives1.twoplustwo.com/showflat.php?Cat=0&Number=8513906&page=0&fpart=13&vc=1)
+
+As RayW used Cactus Kev
+(Cactus Kev's Eval Routine ref http://www.suffecool.net/poker/evaluator.html)
+in his original work, and the resulting code was published and made
+available under GPL, and stayed in the public domain without any complains,
+we believe that the Cactus Kev code is hence made available under GPL. 
+
+As a result, we make all of the code as part of this distribution 
+available under GPL.
+
+Authors
+=======
+
+Ivan Smirnov
+Timothy N. Tsvetkov
+Ray Wooten
+Kevin L. Suffecool
+
+Contributors
+============
+
+Sergey Pastukhov
+Egor Azanov
