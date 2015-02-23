@@ -123,12 +123,16 @@ Authors
 =======
 
 Ivan Smirnov
+
 Timothy N. Tsvetkov
+
 Ray Wooten
+
 Kevin L. Suffecool
 
 Contributors
 ============
 
 Sergey Pastukhov
+
 Egor Azanov
